@@ -16,6 +16,7 @@ void setup() {
 
 void loop() {
   Serial3.println(String(counter));
+  Serial.println("Sent message: " + String(counter));
 
   counter++;
   delay(1000);

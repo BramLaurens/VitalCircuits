@@ -1,12 +1,39 @@
 #include <Arduino.h>
+#include <RH_ASK.h>
+#include <SPI.h>
 
-// put function declarations here:
-int myFunction(int, int);
+RH_ASK driver;
+
+// Define the structure to hold sensor data
+struct sensorData {
+    uint8_t pressure_sensor;        // Pressure sensor value (0 - 255)
+    int32_t temperature_sensor;     // Temperature sensor value (-32,768 to 32,767)
+    uint16_t moisture_sensor;       // Moisture sensor value (0 - 65,535)
+    uint8_t heartbeat[10];          // Array for heartbeat data (0 - 255)
+};
 
 void setup() {
-
+    Serial.begin(9600);  // Initialize serial communication for debugging
+    if (!driver.init()) {
+        Serial.println("Initialization failed"); // Print error message if initialization fails
+    }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+    sensorData data;  // Create an instance of sensorData structure
+    data.pressure_sensor = 120;  // Example pressure sensor value
+    data.temperature_sensor = -25;  // Example temperature value
+    data.moisture_sensor = 512;  // Example moisture sensor value
+    
+    // Fill heartbeat array with example values (0, 1, 2, ..., 9)
+    for (int i = 0; i < 10; i++) {
+        data.heartbeat[i] = i;
+    }
+
+    // Send the sensor data as a byte array
+    driver.send((uint8_t*)&data, sizeof(data));
+    driver.waitPacketSent(); // Wait until data is fully sent
+
+    Serial.println("Data sent!"); 
+    delay(1000); // Wait 1 second before sending again
 }

@@ -67,7 +67,8 @@ void setup()
 }
 
 
-void loop() {
+void loop() 
+{
     unsigned long start = millis(); // Save the current time (miliseconds since program start)
 
     driver.send((uint8_t *)&message, sizeof(message)); 

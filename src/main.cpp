@@ -45,6 +45,7 @@ void loop()
   if (millis() - lastSend > 1000) {
     lastSend = millis();
     LoraTTL.sendMessage(&testdata, sizeof(testdata));
+    Serial.println("Message sent");
   }
 
 }

@@ -2,8 +2,9 @@
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
 
-RH_ASK driver;
-
+// Rx 21 
+// Tx 19
+RH_ASK driver(2000,21, 19);
 
 struct sensordata_struct
 {
@@ -77,7 +78,8 @@ void loop()
 
     // Data send and output the duration of the package send.
     Serial.print("Data send. duration: ");
-    Serial.println(millis() - start);
+    Serial.print(millis() - start);
+    Serial.println(" ms.");
     
     delay(10);
 }

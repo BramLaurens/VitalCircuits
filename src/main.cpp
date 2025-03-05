@@ -55,7 +55,6 @@ void setup()
 
   // Create the final message.
   message.soc = 1;                                    // Start of communication
-  message.pl = sizeof(message) - sizeof(message.lrc); // The packet length is the size of the total message minus the lrc part.
   message.src_ID = 0x04;                              // (0x04 = 0000 0100) The source ID for EV1A Group 4.
   message.des_ID = 0x04;                              // The destination ID, in this case EV1A Group 4.
   message.pc= 1;                                      // The packet counter, in this case 1.
@@ -63,7 +62,8 @@ void setup()
   message.data = test_data;                           // The data
   message.eot = 0xFF;                                 // End of transmission bit. This is FF in our case.
   message.lrc = 0;                                    // TODO: The Longitudinal Redundancy Check
-
+  
+  message.pl = sizeof(message) - sizeof(message.lrc); // The packet length is the size of the total message minus the lrc part.
 }
 
 

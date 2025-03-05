@@ -2,8 +2,9 @@
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
 
-RH_ASK driver;
-
+// Rx 21 
+// Tx 19
+RH_ASK driver(2000,21, 19);
 
 struct sensordata_struct
 {
@@ -26,58 +27,45 @@ struct message_struct
   char lrc;   
 };
 
-sensordata_struct test_data;
-message_struct message;
-
-
 void setup() 
 {
   Serial.begin(9600);
 
   if (!driver.init()) 
   {
-    Serial.println("init failed");
+    Serial.println("Initialization failed");  // If the driver initialization fails, print an error message
   }
-
-  // Create test data
-  // Evantually this will be replaced by real sensor data.
-  test_data = {
-    11,       // pressure_sensor
-    50,       // temperature_sensor
-    100,      // moisture_sensor
-    {0}       // heartbear (initialize all to 0)
-  };
-
-  // Fill heartbear with values from 0 to 99
-  for (int i = 0; i < 10; i++) {
-    test_data.heartbeat[i]=i;
-  }
-
-  // Create the final message.
-  message.soc = 1;                                    // Start of communication
-  message.src_ID = 0x04;                              // (0x04 = 0000 0100) The source ID for EV1A Group 4.
-  message.des_ID = 0x04;                              // The destination ID, in this case EV1A Group 4.
-  message.pc= 1;                                      // The packet counter, in this case 1.
-  message.functiecode = 2;                            // The function code, in this case 2 (Data verzenden).
-  message.data = test_data;                           // The data
-  message.eot = 0xFF;                                 // End of transmission bit. This is FF in our case.
-  message.lrc = 0;                                    // TODO: The Longitudinal Redundancy Check
-  
-  message.pl = sizeof(message) - sizeof(message.lrc); // The packet length is the size of the total message minus the lrc part.
 }
 
 
 void loop() 
 {
-    unsigned long start = millis(); // Save the current time (miliseconds since program start)
+  uint8_t buf[sizeof(message_struct)];  // Define a buffer to store the received data
+  uint8_t buflen = sizeof(buf);     // Store the length of the buffer
 
-    driver.send((uint8_t *)&message, sizeof(message)); 
-    driver.waitPacketSent();
+  if (driver.recv(buf, &buflen)) 
+  {  // Check if data is received from the transmitter
+      message_struct message_recieved;  // Create an instance to store the received sensor data
 
+      memcpy(&message_recieved, buf, sizeof(message_recieved));  // Copy received bytes into the structure
 
-    // Data send and output the duration of the package send.
-    Serial.print("Data send. duration: ");
-    Serial.println(millis() - start);
-    
-    delay(10);
+      // Print message info.
+      Serial.print("functiecode: ");
+      Serial.println(message_recieved.functiecode);
+      Serial.print("src_ID: ");
+      Serial.println(message_recieved.src_ID);
+      Serial.print("des_ID: ");
+      Serial.println(message_recieved.des_ID);
+      Serial.print("pc: ");
+      Serial.println(message_recieved.pc);
+      Serial.print("pl: ");
+      Serial.println(message_recieved.pl);
+
+      // Print some data.
+      Serial.println("Data:");
+      Serial.print("Heartbeat[5]: ");
+      Serial.println(message_recieved.data.heartbeat[5]);  
+      Serial.print("moisture sensor: ");
+      Serial.println(message_recieved.data.moisture_sensor);
+  }
 }

@@ -51,21 +51,21 @@ void loop()
 
       // Print message info.
       Serial.print("functiecode: ");
-      Serial.println(message_recieved.functiecode);
+      Serial.println(message_recieved.functiecode, HEX);
       Serial.print("src_ID: ");
-      Serial.println(message_recieved.src_ID);
+      Serial.println(message_recieved.src_ID, HEX);
       Serial.print("des_ID: ");
-      Serial.println(message_recieved.des_ID);
+      Serial.println(message_recieved.des_ID, HEX);
       Serial.print("pc: ");
-      Serial.println(message_recieved.pc);
+      Serial.println(message_recieved.pc, HEX);
       Serial.print("pl: ");
-      Serial.println(message_recieved.pl);
+      Serial.println(message_recieved.pl, HEX);
 
       // Print some data.
       Serial.println("Data:");
       Serial.print("Heartbeat[5]: ");
-      Serial.println(message_recieved.data.heartbeat[5]);  
+      Serial.println(message_recieved.data.heartbeat[5], HEX);  
       Serial.print("moisture sensor: ");
-      Serial.println(message_recieved.data.moisture_sensor);
+      Serial.println(message_recieved.data.moisture_sensor, HEX);
   }
 }

@@ -31,11 +31,12 @@ void setup()
   delay(500);
   Serial.println();
   LoRaPort.begin(115200, SERIAL_8N1, RX_GPIO, TX_GPIO);
+  
+  LoraTTL.begin();
 
   LoRaSetConfig();
 
   Serial.println("Waiting for data...");
-  LoraTTL.begin();
 }
 
 void loop()

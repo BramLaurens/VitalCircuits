@@ -23,8 +23,6 @@ struct testData {
   bool testbool;
 };
 
-testData testdata = {1, 2.3, true};
-
 void setup()
 {
   //Serial setup
@@ -36,16 +34,26 @@ void setup()
 
   LoRaSetConfig();
 
+  Serial.println("Waiting for data...");
   LoraTTL.begin();
 }
 
 void loop()
 {
-  static unsigned long lastSend = millis();
-  if (millis() - lastSend > 1000) {
-    lastSend = millis();
-    LoraTTL.sendMessage(&testdata, sizeof(testdata));
-  }
+  if(LoraTTL.available()){
+    ResponseStructContainer RSC = LoraTTL.receiveMessage(sizeof(testData));
+    testData testdata = *(testData *) RSC.data;
+
+    Serial.print("Test int: ");
+    Serial.println(testdata.testint);
+    Serial.print("Test float: ");
+    Serial.println(testdata.testfloat);
+    Serial.print("Test bool: ");
+    Serial.println(testdata.testbool);
+    Serial.println();
+    }
+    
+  
 
 }
 
@@ -60,7 +68,7 @@ void LoRaSetConfig(){
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
 
-  LoraConfig.SPED.uartBaudRate = UART_BPS_9600;
+  LoraConfig.SPED.uartBaudRate = UART_BPS_115200;
   LoraConfig.SPED.uartParity = MODE_00_8N1;
   LoraConfig.SPED.airDataRate = AIR_DATA_RATE_010_24;
 

@@ -42,7 +42,8 @@ void setup()
 
   // Create test data
   // Evantually this will be replaced by real sensor data.
-  test_data = {
+  test_data = 
+  {
     11,       // pressure_sensor
     50,       // temperature_sensor
     100,      // moisture_sensor
@@ -50,7 +51,8 @@ void setup()
   };
 
   // Fill heartbear with values from 0 to 99
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++) 
+  {
     test_data.heartbeat[i]=i;
   }
 
@@ -80,6 +82,4 @@ void loop()
     Serial.print("Data send. duration: ");
     Serial.print(millis() - start);
     Serial.println(" ms.");
-    
-    delay(10);
 }

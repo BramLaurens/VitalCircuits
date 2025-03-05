@@ -60,7 +60,7 @@ void LoRaSetConfig(){
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
 
-  LoraConfig.SPED.uartBaudRate = UART_BPS_9600;
+  LoraConfig.SPED.uartBaudRate = UART_BPS_115200;
   LoraConfig.SPED.uartParity = MODE_00_8N1;
   LoraConfig.SPED.airDataRate = AIR_DATA_RATE_010_24;
 

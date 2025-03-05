@@ -34,9 +34,9 @@ void setup()
   Serial.println();
   LoRaPort.begin(115200, SERIAL_8N1, RX_GPIO, TX_GPIO);
 
-  LoRaSetConfig();
-
   LoraTTL.begin();
+
+  LoRaSetConfig();
 }
 
 void loop()

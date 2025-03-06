@@ -5,10 +5,10 @@
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
 #include <HardwareSerial.h>
-#include <EByte_LoRa_E220_library.h>
+#include <LoRa_E220.h>
 
-#define RX_GPIO 18
-#define TX_GPIO 19
+#define RX_GPIO 16
+#define TX_GPIO 17
 
 HardwareSerial LoRaPort(2);
 LoRa_E220 LoraTTL(&LoRaPort);
@@ -53,10 +53,13 @@ void loop()
 void LoRaSetConfig(){
   ResponseStructContainer c; //Make a struct container for the response from event on the LoRa module (data, rssi, status)
   c = LoraTTL.getConfiguration(); //Get the current configuration of the LoRa module and store the return in the struct container
-  Configuration LoraConfig = *(Configuration *) c.data; //Type cast to make sure the data is actually stored in the config struct
+  Configuration LoraConfig = *(Configuration *) c.data; //Type cast to make sure the retreived data is actually stored in the config struct
   Serial.println(c.status.getResponseDescription());
   Serial.println(c.status.code);
 
+  printLoRaParameters(LoraConfig);
+
+  /*
   LoraConfig.ADDL = 0x02;  // Low byte of address
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
@@ -81,7 +84,9 @@ void LoRaSetConfig(){
   Serial.println(c.status.getResponseDescription());
   Serial.println(c.status.code);
 
-  printLoRaParameters(LoraConfig);
+  //printLoRaParameters(LoraConfig);
+  */
+  
   c.close(); //Close and clear the struct container
 
 }

@@ -10,9 +10,7 @@
 #define RX_GPIO 16
 #define TX_GPIO 17
 
-
-HardwareSerial LoRaPort(2);
-LoRa_E220 LoraTTL(&LoRaPort);
+LoRa_E220 LoraTTL(&Serial2);
 
 void printLoRaParameters(struct Configuration configuration);
 void printLoRaModuleInformation(struct ModuleInformation moduleInformation);
@@ -33,21 +31,18 @@ void setup()
   while(!Serial){};
   delay(500);
   Serial.println();
-  LoRaPort.begin(9600, SERIAL_8N1, RX_GPIO, TX_GPIO);
 
-  LoraTTL.begin();
+  if (LoraTTL.begin()) {
+    Serial.println("LoRa module initialized successfully");
+  } else {
+    Serial.println("Failed to initialize LoRa module");
+  }
 
   LoRaSetConfig();
 }
 
 void loop()
 {
-  static unsigned long lastSend = millis();
-  if (millis() - lastSend > 1000) {
-    lastSend = millis();
-    LoraTTL.sendMessage(&testdata, sizeof(testdata));
-    Serial.println("Message sent");
-  }
 
 }
 
@@ -58,9 +53,9 @@ void LoRaSetConfig(){
   Serial.println(c.status.getResponseDescription());
   Serial.println(c.status.code);
 
-  printLoRaParameters(LoraConfig);
+  //printLoRaParameters(LoraConfig);
 
-  /*
+  
   LoraConfig.ADDL = 0x02;  // Low byte of address
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
@@ -86,7 +81,7 @@ void LoRaSetConfig(){
   Serial.println(c.status.code);
 
   //printLoRaParameters(LoraConfig);
-  */
+  
   
   c.close(); //Close and clear the struct container
 

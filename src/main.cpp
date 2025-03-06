@@ -10,6 +10,7 @@
 #define RX_GPIO 16
 #define TX_GPIO 17
 
+
 HardwareSerial LoRaPort(2);
 LoRa_E220 LoraTTL(&LoRaPort);
 
@@ -28,11 +29,11 @@ testData testdata = {1, 2.3, true};
 void setup()
 {
   //Serial setup
-  Serial.begin(115200);
+  Serial.begin(9600);
   while(!Serial){};
   delay(500);
   Serial.println();
-  LoRaPort.begin(115200, SERIAL_8N1, RX_GPIO, TX_GPIO);
+  LoRaPort.begin(9600, SERIAL_8N1, RX_GPIO, TX_GPIO);
 
   LoraTTL.begin();
 
@@ -64,7 +65,7 @@ void LoRaSetConfig(){
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
 
-  LoraConfig.SPED.uartBaudRate = UART_BPS_115200;
+  LoraConfig.SPED.uartBaudRate = UART_BPS_9600;
   LoraConfig.SPED.uartParity = MODE_00_8N1;
   LoraConfig.SPED.airDataRate = AIR_DATA_RATE_010_24;
 

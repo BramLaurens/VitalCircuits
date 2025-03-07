@@ -6,20 +6,20 @@
 
 int counter = 0;
 
-HardwareSerial Serial3(2);
+HardwareSerial UARTtest(2);
 
 void setup() {
   Serial.begin(9600);
-  Serial3.begin(9600, SERIAL_8N1, RX_GPIO, TX_GPIO);
+  UARTtest.begin(9600, SERIAL_8N1, RX_GPIO, TX_GPIO);
   Serial.println("Setup!");
 
 }
 
 void loop() {
 
-  while (Serial3.available()>0) 
+  while (UARTtest.available()) 
   {
-    String RXdata = Serial3.readString();
+    String RXdata = UARTtest.readString();
     Serial.print("Received: " + RXdata);
   }
   

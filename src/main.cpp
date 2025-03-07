@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#define RX_GPIO 2
-#define TX_GPIO 4
+#define RX_GPIO 26
+#define TX_GPIO 27
 
 int counter = 0;
 

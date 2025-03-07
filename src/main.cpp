@@ -19,5 +19,5 @@ void loop() {
   Serial.println("Sent message: " + String(counter));
 
   counter++;
-  delay(1000);
+  delay(100);
 }

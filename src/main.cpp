@@ -4,13 +4,12 @@
 #include <Arduino.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
-#include <HardwareSerial.h>
 #include <LoRa_E220.h>
 
 #define RX_GPIO 16
 #define TX_GPIO 17
 
-LoRa_E220 LoraTTL(&Serial2);
+LoRa_E220 LoraTTL(&Serial2, 15, 21, 19);
 
 void printLoRaParameters(struct Configuration configuration);
 void printLoRaModuleInformation(struct ModuleInformation moduleInformation);
@@ -27,7 +26,8 @@ testData testdata = {1, 2.3, true};
 void setup()
 {
   //Serial setup
-  Serial.begin(9600);
+  Serial.begin(56700);
+  Serial2.begin(56700, SERIAL_8N1, 16, 17);
   while(!Serial){};
   delay(500);
   Serial.println();
@@ -43,7 +43,11 @@ void setup()
 
 void loop()
 {
-
+  if (Serial.available()) {
+  String input = Serial.readString();
+  ResponseStatus rs = LoraTTL.sendMessage(input);
+  Serial.println(rs.getResponseDescription());
+}
 }
 
 void LoRaSetConfig(){
@@ -60,9 +64,9 @@ void LoRaSetConfig(){
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
 
-  LoraConfig.SPED.uartBaudRate = UART_BPS_9600;
+  LoraConfig.SPED.uartBaudRate = UART_BPS_57600;
   LoraConfig.SPED.uartParity = MODE_00_8N1;
-  LoraConfig.SPED.airDataRate = AIR_DATA_RATE_010_24;
+  LoraConfig.SPED.airDataRate = AIR_DATA_RATE_111_625;
 
   LoraConfig.OPTION.subPacketSetting = SPS_200_00;
   LoraConfig.OPTION.RSSIAmbientNoise = RSSI_AMBIENT_NOISE_DISABLED;
@@ -80,7 +84,7 @@ void LoRaSetConfig(){
   Serial.println(c.status.getResponseDescription());
   Serial.println(c.status.code);
 
-  //printLoRaParameters(LoraConfig);
+  printLoRaParameters(LoraConfig);
   
   
   c.close(); //Close and clear the struct container

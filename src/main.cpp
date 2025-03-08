@@ -4,14 +4,12 @@
 #include <Arduino.h>
 #include <RH_ASK.h>
 #include <SPI.h> // Not actually used but needed to compile
-#include <HardwareSerial.h>
-#include <EByte_LoRa_E220_library.h>
+#include <LoRa_E220.h>
 
-#define RX_GPIO 18
-#define TX_GPIO 19
+#define RX_GPIO 16
+#define TX_GPIO 17
 
-HardwareSerial LoRaPort(2);
-LoRa_E220 LoraTTL(&LoRaPort);
+LoRa_E220 LoraTTL(&Serial2, 15, 21, 19);
 
 void printLoRaParameters(struct Configuration configuration);
 void printLoRaModuleInformation(struct ModuleInformation moduleInformation);
@@ -23,55 +21,58 @@ struct testData {
   bool testbool;
 };
 
+testData testdata = {1, 2.3, true};
+
 void setup()
 {
   //Serial setup
-  Serial.begin(115200);
+  Serial.begin(56700);
+  Serial2.begin(56700, SERIAL_8N1, 16, 17);
   while(!Serial){};
   delay(500);
   Serial.println();
-  LoRaPort.begin(115200, SERIAL_8N1, RX_GPIO, TX_GPIO);
-  
-  LoraTTL.begin();
+
+  if (LoraTTL.begin()) {
+    Serial.println("LoRa module initialized successfully");
+  } else {
+    Serial.println("Failed to initialize LoRa module");
+  }
 
   LoRaSetConfig();
-
-  Serial.println("Waiting for data...");
 }
 
 void loop()
 {
-  if(LoraTTL.available()){
-    ResponseStructContainer RSC = LoraTTL.receiveMessage(sizeof(testData));
-    testData testdata = *(testData *) RSC.data;
-
-    Serial.print("Test int: ");
-    Serial.println(testdata.testint);
-    Serial.print("Test float: ");
-    Serial.println(testdata.testfloat);
-    Serial.print("Test bool: ");
-    Serial.println(testdata.testbool);
-    Serial.println();
-    }
-    
-  
-
+  if (LoraTTL.available()>1) {
+    // read the String message
+  ResponseContainer rc = LoraTTL.receiveMessage();
+  // Is something goes wrong print error
+  if (rc.status.code!=1){
+      Serial.println(rc.status.getResponseDescription());
+  }else{
+      // Print the data received
+      Serial.println(rc.data);
+  }
+}
 }
 
 void LoRaSetConfig(){
   ResponseStructContainer c; //Make a struct container for the response from event on the LoRa module (data, rssi, status)
   c = LoraTTL.getConfiguration(); //Get the current configuration of the LoRa module and store the return in the struct container
-  Configuration LoraConfig = *(Configuration *) c.data; //Type cast to make sure the data is actually stored in the config struct
+  Configuration LoraConfig = *(Configuration *) c.data; //Type cast to make sure the retreived data is actually stored in the config struct
   Serial.println(c.status.getResponseDescription());
   Serial.println(c.status.code);
 
+  //printLoRaParameters(LoraConfig);
+
+  
   LoraConfig.ADDL = 0x02;  // Low byte of address
   LoraConfig.ADDH = 0x00; // High byte of address
   LoraConfig.CHAN = 18;   // Channel
 
-  LoraConfig.SPED.uartBaudRate = UART_BPS_115200;
+  LoraConfig.SPED.uartBaudRate = UART_BPS_57600;
   LoraConfig.SPED.uartParity = MODE_00_8N1;
-  LoraConfig.SPED.airDataRate = AIR_DATA_RATE_010_24;
+  LoraConfig.SPED.airDataRate = AIR_DATA_RATE_111_625;
 
   LoraConfig.OPTION.subPacketSetting = SPS_200_00;
   LoraConfig.OPTION.RSSIAmbientNoise = RSSI_AMBIENT_NOISE_DISABLED;
@@ -90,6 +91,8 @@ void LoRaSetConfig(){
   Serial.println(c.status.code);
 
   printLoRaParameters(LoraConfig);
+  
+  
   c.close(); //Close and clear the struct container
 
 }

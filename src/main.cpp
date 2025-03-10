@@ -72,8 +72,8 @@ void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 
 void setup() {
-	Serial.begin(57600);
-  
+	Serial.begin(9600);
+  Serial2.begin(9600, SERIAL_8N1, 16, 17);
 	while(!Serial){};
 	delay(500);
 
@@ -82,15 +82,9 @@ void setup() {
 
 	// Startup all pins and UART
 	e220ttl.begin();
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
 
-  e220ttl.resetModule();
   //Set LoRa module config
   SetLoRaConfig();
-
-  Serial2.flush();
-  Serial2.end();
-  Serial2.begin(115200, SERIAL_8N1, 16, 17);
 }
 
 void loop() {
@@ -106,23 +100,12 @@ void loop() {
         Serial.println(rc.data);
     }
   }
-
-  //Sending
-  /*if (Serial.available()) {
+  if (Serial.available()) {
       String input = Serial.readString();
-      ResponseStatus rs = e220ttl.sendMessage(input);
       Serial.println("Sent:" + input);
+      ResponseStatus rs = e220ttl.sendMessage(input);
       Serial.println(rs.getResponseDescription());
-  }*/
-
-  if(digitalRead(15) == HIGH){
-    ResponseStatus rs = e220ttl.sendMessage("ttttttttttttttttttttt");
-    Serial.println(rs.getResponseDescription());
-    Serial.println(millis());
-    Serial2.flush();
   }
-  delay(100);
-  
 }
 
 void SetLoRaConfig(){
@@ -140,11 +123,12 @@ void SetLoRaConfig(){
 	configuration.ADDH = 0x00; // Second part
 
 	configuration.CHAN = 18; // Communication channel
-	configuration.SPED.uartBaudRate = UART_BPS_115200; // Serial baud rate
-	configuration.SPED.airDataRate = AIR_DATA_RATE_111_625; // Air baud rate
+
+	configuration.SPED.uartBaudRate = UART_BPS_9600; // Serial baud rate
+	configuration.SPED.airDataRate = AIR_DATA_RATE_010_24; // Air baud rate
 	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
 
-	configuration.OPTION.subPacketSetting = SPS_032_11; // Packet size
+	configuration.OPTION.subPacketSetting = SPS_200_00; // Packet size
 	configuration.OPTION.RSSIAmbientNoise = RSSI_AMBIENT_NOISE_DISABLED; // Need to send special command
 	configuration.OPTION.transmissionPower = POWER_22; // Device power
 

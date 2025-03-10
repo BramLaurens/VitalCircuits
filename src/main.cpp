@@ -106,12 +106,19 @@ void loop() {
         Serial.println(rc.data);
     }
   }
-  if (Serial.available()) {
+
+  //Sending
+  /*if (Serial.available()) {
       String input = Serial.readString();
-      Serial.println("Sent:" + input);
       ResponseStatus rs = e220ttl.sendMessage(input);
+      Serial.println("Sent:" + input);
       Serial.println(rs.getResponseDescription());
-  }
+  }*/
+
+  e220ttl.sendMessage("piemls");
+  Serial.println("Sent: piemls");
+  delay(100);
+  
 }
 
 void SetLoRaConfig(){
@@ -131,7 +138,7 @@ void SetLoRaConfig(){
 	configuration.CHAN = 18; // Communication channel
 
 	configuration.SPED.uartBaudRate = UART_BPS_57600; // Serial baud rate
-	configuration.SPED.airDataRate = AIR_DATA_RATE_010_24; // Air baud rate
+	configuration.SPED.airDataRate = AIR_DATA_RATE_110_384; // Air baud rate
 	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
 
 	configuration.OPTION.subPacketSetting = SPS_200_00; // Packet size

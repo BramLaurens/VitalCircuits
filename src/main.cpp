@@ -71,6 +71,42 @@ void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 
+
+// Define the struct for the message
+struct sensordata_struct
+{
+    unsigned char pressure_sensor[30];        // 0 - 255
+    int temperature_sensor;               // -32,768 - 32,767
+    short unsigned int moisture_sensor;   // 0 - 65,535
+    int heartbeat[30];                // -32,768 - 32,767
+};
+
+//the total size of the struct is 192 bytes
+// explanation
+// 60 bytes for pressure_sensor
+// 2 bytes for temperature_sensor
+// 2 bytes for moisture_sensor
+// 120 bytes for heartbeat
+// 8 bytes for the rest of the struct
+
+
+struct message_struct
+{
+  char soc;
+  char pl;
+  char src_ID;
+  char des_ID;
+  char pc;
+  char functiecode;
+  sensordata_struct data;
+  char lrc;   
+  char eot;
+};
+
+sensordata_struct test_data;
+message_struct message; 
+
+
 void setup() {
 	Serial.begin(9600);
   Serial2.begin(9600, SERIAL_8N1, 16, 17);
@@ -91,13 +127,20 @@ void loop() {
     // If something available
   if (e220ttl.available()>1) {
       // read the String message
-    ResponseContainer rc = e220ttl.receiveMessage();
+    ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message));
+	message_struct recieved_message = *(message_struct*) rsc.data;
+
     // Is something goes wrong print error
-    if (rc.status.code!=1){
-        Serial.println(rc.status.getResponseDescription());
+    if (rsc.status.code!=1){
+        Serial.println(rsc.status.getResponseDescription());
     }else{
         // Print the data received
-        Serial.println(rc.data);
+		for (int i = 0; i < 30; i++) 
+		{
+			Serial.println(recieved_message.data.pressure_sensor[i]);
+		}
+        Serial.println(recieved_message.des_ID, HEX);
+
     }
   }
   if (Serial.available()) {

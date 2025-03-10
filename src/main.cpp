@@ -72,8 +72,8 @@ void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 
 void setup() {
-	Serial.begin(9600);
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
+	Serial.begin(57600);
+
 	while(!Serial){};
 	delay(500);
 
@@ -82,9 +82,15 @@ void setup() {
 
 	// Startup all pins and UART
 	e220ttl.begin();
+  Serial2.begin(9600, SERIAL_8N1, 16, 17);
 
+  e220ttl.resetModule();
   //Set LoRa module config
   SetLoRaConfig();
+
+  Serial2.flush();
+  Serial2.end();
+  Serial2.begin(57600, SERIAL_8N1, 16, 17);
 }
 
 void loop() {
@@ -124,7 +130,7 @@ void SetLoRaConfig(){
 
 	configuration.CHAN = 18; // Communication channel
 
-	configuration.SPED.uartBaudRate = UART_BPS_9600; // Serial baud rate
+	configuration.SPED.uartBaudRate = UART_BPS_57600; // Serial baud rate
 	configuration.SPED.airDataRate = AIR_DATA_RATE_010_24; // Air baud rate
 	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
 

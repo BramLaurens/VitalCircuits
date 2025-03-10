@@ -8,10 +8,10 @@ RH_ASK driver(2000,21, 19);
 
 struct sensordata_struct
 {
-    unsigned char pressure_sensor;        // 0 - 255
+    unsigned char pressure_sensor[60];        // 0 - 255
     int temperature_sensor;               // -32,768 - 32,767
     short unsigned int moisture_sensor;   // 0 - 65,535
-    unsigned char heartbeat[10];          // 0 - 255
+    int heartbeat[60];                // -32,768 - 32,767
 };
 
 struct message_struct
@@ -28,7 +28,7 @@ struct message_struct
 };
 
 sensordata_struct test_data;
-message_struct message;
+message_struct message; // Total size: 192 Bytes.
 
 
 void setup() 
@@ -44,16 +44,17 @@ void setup()
   // Evantually this will be replaced by real sensor data.
   test_data = 
   {
-    11,       // pressure_sensor
+    {0},       // pressure_sensor
     50,       // temperature_sensor
     100,      // moisture_sensor
     {0}       // heartbear (initialize all to 0)
   };
 
-  // Fill heartbear with values from 0 to 99
-  for (int i = 0; i < 10; i++) 
+  // Fill heartbeat with values from 0 to 99
+  for (int i = 0; i < 60; i++) 
   {
     test_data.heartbeat[i]=i;
+    test_data.pressure_sensor[i]=i;
   }
 
   // Create the final message.

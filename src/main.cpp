@@ -138,7 +138,10 @@ void setup() {
 
 
 	Serial.print("Size of message: ");
-	Serial.println(sizeof(message.data));
+	Serial.println(sizeof(message));
+
+	Serial.print("Size of test_data: ");
+	Serial.println(sizeof(test_data));
 
 
 

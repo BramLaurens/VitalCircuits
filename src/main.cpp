@@ -71,13 +71,75 @@ void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 
+
+// Define the struct for the message
+struct sensordata_struct
+{
+    unsigned char pressure_sensor[30];        // 0 - 255
+    int temperature_sensor;               // -32,768 - 32,767
+    short unsigned int moisture_sensor;   // 0 - 65,535
+    int heartbeat[30];                // -32,768 - 32,767
+};
+
+//the total size of the struct is 192 bytes
+// explanation
+// 60 bytes for pressure_sensor
+// 2 bytes for temperature_sensor
+// 2 bytes for moisture_sensor
+// 120 bytes for heartbeat
+// 8 bytes for the rest of the struct
+
+
+struct message_struct
+{
+  char soc;
+  char pl;
+  char src_ID;
+  char des_ID;
+  char pc;
+  char functiecode;
+  sensordata_struct data;
+  char lrc;   
+  char eot;
+};
+
+sensordata_struct test_data;
+message_struct message; 
+
+
 void setup() {
 	Serial.begin(9600);
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
+  	Serial2.begin(9600, SERIAL_8N1, 16, 17);
 	while(!Serial){};
 	delay(500);
 
 	Serial.println();
+
+
+	// fill test_data
+	for (int i = 0; i < 30; i++)
+	{
+		test_data.pressure_sensor[i] = i;
+		test_data.heartbeat[i] = i;
+	}
+	test_data.temperature_sensor = 12345;
+	test_data.moisture_sensor = 54321;
+
+	// fill message
+	message.soc = 0x01;
+	message.pl = 0x01;
+	message.src_ID = 0x01;
+	message.des_ID = 0x07;
+	message.pc = 0x01;
+	message.functiecode = 0x01;
+	message.data = test_data;
+	message.eot = 0x04;
+	message.lrc = 0x01;
+
+
+	Serial.print("Size of message: ");
+	Serial.println(sizeof(message.data));
+
 
 
 	// Startup all pins and UART
@@ -103,7 +165,8 @@ void loop() {
   if (Serial.available()) {
       String input = Serial.readString();
       Serial.println("Sent:" + input);
-      ResponseStatus rs = e220ttl.sendMessage(input);
+      ResponseStatus rs = e220ttl.sendMessage((uint8_t*)&message, sizeof(message));
+
       Serial.println(rs.getResponseDescription());
   }
 }

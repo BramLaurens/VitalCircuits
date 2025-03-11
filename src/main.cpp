@@ -121,6 +121,12 @@ void setup() {
 
   //Set LoRa module config
   SetLoRaConfig();
+
+  // set new serial speed
+  Serial2.flush();
+  Serial2.end();
+  Serial2.begin(115200);
+
 }
 
 void loop() {
@@ -167,8 +173,8 @@ void SetLoRaConfig(){
 
 	configuration.CHAN = 18; // Communication channel
 
-	configuration.SPED.uartBaudRate = UART_BPS_9600; // Serial baud rate
-	configuration.SPED.airDataRate = AIR_DATA_RATE_010_24; // Air baud rate
+	configuration.SPED.uartBaudRate = UART_BPS_115200; // Serial baud rate
+	configuration.SPED.airDataRate = AIR_DATA_RATE_111_625; // Air baud rate
 	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
 
 	configuration.OPTION.subPacketSetting = SPS_200_00; // Packet size

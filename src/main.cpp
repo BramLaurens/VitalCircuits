@@ -93,7 +93,7 @@ void loop() {
         message.pc = counter;    // Update packet counter in the message
     }
 
-    // Optionally clear arrays if you want to reset the data (not needed for circular buffer)
+    // Optionally clear arrays if you want to reset the data
     if (heartbeatIndex == 0) {
         memset(live_data.heartbeat_sensor, 0, sizeof(live_data.heartbeat_sensor)); 
         memset(live_data.pressure_sensor, 0, sizeof(live_data.pressure_sensor)); 

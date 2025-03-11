@@ -25,70 +25,18 @@
 #include "LoRa_E220.h"
 
 
-// ---------- esp8266 pins --------------
-//LoRa_E220 e220ttl(RX, TX, AUX, M0, M1);  // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(D3, D4, D5, D7, D6); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX AUX M0 M1
-//LoRa_E220 e220ttl(D2, D3); // Config without connect AUX and M0 M1
-
-//#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(D2, D3); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(&mySerial, D5, D7, D6); // AUX M0 M1
-// -------------------------------------
-
-// ---------- Arduino pins --------------
-//LoRa_E220 e220ttl(4, 5, 3, 7, 6); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX AUX M0 M1
-//LoRa_E220 e220ttl(4, 5); // Config without connect AUX and M0 M1
-
-//#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(4, 5); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(&mySerial, 3, 7, 6); // AUX M0 M1
-// -------------------------------------
-
-// ------------- Arduino Nano 33 IoT -------------
-// LoRa_E220 e220ttl(&Serial1, 2, 4, 6); //  RX AUX M0 M1
-// -------------------------------------------------
-
-// ------------- Arduino MKR WiFi 1010 -------------
-// LoRa_E220 e220ttl(&Serial1, 0, 2, 4); //  RX AUX M0 M1
-// -------------------------------------------------
-
 // ---------- esp32 pins --------------
 LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
-
-//LoRa_E220 e220ttl(&Serial2, 22, 4, 18, 21, 19, UART_BPS_RATE_9600); //  esp32 RX <-- e220 TX, esp32 TX --> e220 RX AUX M0 M1
-// -------------------------------------
-
-// ---------- Raspberry PI Pico pins --------------
-// LoRa_E220 e220ttl(&Serial2, 2, 10, 11); //  RX AUX M0 M1
-// -------------------------------------
-
-// ---------------- STM32 --------------------
-//HardwareSerial Serial2(USART2);   // PA3  (RX)  PA2  (TX)
-//LoRa_E220 e220ttl(&Serial2, PA0, PB0, PB10); //  RX AUX M0 M1
-// -------------------------------------------------
-
-void printParameters(struct Configuration configuration);
-void printModuleInformation(struct ModuleInformation moduleInformation);
-void SetLoRaConfig();
 
 
 // Define the struct for the message
 struct sensordata_struct
 {
-    unsigned char pressure_sensor[60];        // 0 - 255
+    unsigned char pressure_sensor[59];        // 0 - 255
     int temperature_sensor;               // -32,768 - 32,767
     short unsigned int moisture_sensor;   // 0 - 65,535
-    short int heartbeat[60];                // -32,768 - 32,767
+    short int heartbeat[59];                // -32,768 - 32,767
 };
-
-//the total size of the struct is 192 bytes
-// explanation
-// 60 bytes for pressure_sensor
-// 2 bytes for temperature_sensor
-// 2 bytes for moisture_sensor
-// 120 bytes for heartbeat
-// 8 bytes for the rest of the struct
-
 
 struct message_struct
 {
@@ -99,9 +47,18 @@ struct message_struct
   char pc;
   char functiecode;
   sensordata_struct data;
-  char lrc;   
+  int lrc;   
   char eot;
 };
+
+
+void printParameters(struct Configuration configuration);
+void printModuleInformation(struct ModuleInformation moduleInformation);
+void SetLoRaConfig();
+
+int create_LRC(message_struct message);
+int count_bits(int num);
+
 
 sensordata_struct test_data;
 message_struct message; 
@@ -117,7 +74,7 @@ void setup() {
 
 
 	// fill test_data
-	for (int i = 0; i < 60; i++)
+	for (int i = 0; i < 59; i++)
 	{
 		test_data.pressure_sensor[i] = i;
 		test_data.heartbeat[i] = i;
@@ -133,56 +90,60 @@ void setup() {
 	message.pc = 0x01;
 	message.functiecode = 0x01;
 	message.data = test_data;
-	message.eot = 0x04;
-	message.lrc = 0x01;
+	
+	message.eot = 0x03;
 
+
+	message.lrc = create_LRC(message);;
 
 	Serial.print("Size of message: ");
 	Serial.println(sizeof(message));
 
-	Serial.print("Size of test_data: ");
-	Serial.println(sizeof(test_data));
+	Serial.print("LRC: ");
+	Serial.println(message.lrc, DEC);
 
-
+	Serial.print("heartbeat 25: ");
+	Serial.println(message.data.heartbeat[24]);
 
 	// Startup all pins and UART
 	e220ttl.begin();
 
-  //Set LoRa module config
-  SetLoRaConfig();
-
-  // set new serial speed
-  Serial2.flush();
-  Serial2.end();
-  Serial2.begin(115200);
+	//Set LoRa module config
+	SetLoRaConfig();
+	
+	// set new serial speed
+	Serial2.flush();
+	Serial2.end();
+	Serial2.begin(115200);
 }
 
 void loop() {
-    // If something available
-  if (e220ttl.available()>1) {
-      // read the String message
-    ResponseContainer rc = e220ttl.receiveMessage();
-    // Is something goes wrong print error
-    if (rc.status.code!=1){
-        Serial.println(rc.status.getResponseDescription());
-    }else{
-        // Print the data received
-        Serial.println(rc.data);
-    }
-  }
-  if (Serial.available()) {
-      //String input = Serial.readString();
-      Serial.print("Sent message");
-	  Serial.print(" (");
-	  Serial.print(millis());
-	  Serial.println(")");
-      ResponseStatus rs = e220ttl.sendMessage((uint8_t*)&message, sizeof(message));
+	// If something available
+	if (e220ttl.available()>1) {
+		// read the String message
+		ResponseContainer rc = e220ttl.receiveMessage();
+		// Is something goes wrong print error
+		if (rc.status.code!=1){
+			Serial.println(rc.status.getResponseDescription());
+		}else{
+			// Print the data received
+			Serial.println(rc.data);
+		}
+	}
+	if (Serial.available()) {
+		//String input = Serial.readString();
+		Serial.print("Sent message");
+		Serial.print(" (");
+		Serial.print(millis());
+		Serial.println(")");
+		ResponseStatus rs = e220ttl.sendMessage((uint8_t*)&message, sizeof(message));
 
-      Serial.print(rs.getResponseDescription());
-	  Serial.print(" (");
-	  Serial.print(millis());
-	  Serial.println(")");
-  }
+		Serial.print(rs.getResponseDescription());
+		Serial.print(" (");
+		Serial.print(millis());
+		Serial.println(")");
+	}
+  
 }
 
 void SetLoRaConfig(){
@@ -264,4 +225,44 @@ void printModuleInformation(struct ModuleInformation moduleInformation) {
 	Serial.print(F("Features : "));  Serial.println(moduleInformation.features, HEX);
 	Serial.println("----------------------------------------");
 
+}
+
+
+// A function that counts all bits in the whole message.
+int create_LRC(message_struct message) {
+	int tot = 0;
+
+	tot += count_bits(message.soc);
+	tot += count_bits(message.pl);
+	tot += count_bits(message.src_ID);
+	tot += count_bits(message.des_ID);
+	tot += count_bits(message.pc);
+	tot += count_bits(message.functiecode);
+	tot += count_bits(message.lrc);
+	tot += count_bits(message.eot);
+	tot += count_bits(message.data.moisture_sensor);
+	tot += count_bits(message.data.temperature_sensor);
+
+	for (char i = 0; i < 59; i++) {
+		tot += count_bits(message.data.pressure_sensor[i]);
+		tot += count_bits(message.data.heartbeat[i]);
+	}
+
+	return tot;
+}
+
+// A function that counts all bits in a number.
+int count_bits(int num) {
+	int tot = 0;
+
+	while (num) {
+		if (num & 0x01) {
+			// if LSB is 1, tot++
+			tot++;
+		}
+
+		// Shift all bits 1 to the right
+		num >>= 1;          
+	}
+	return tot;
 }

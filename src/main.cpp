@@ -75,10 +75,10 @@ void SetLoRaConfig();
 // Define the struct for the message
 struct sensordata_struct
 {
-    unsigned char pressure_sensor[30];        // 0 - 255
+    unsigned char pressure_sensor[60];        // 0 - 255
     int temperature_sensor;               // -32,768 - 32,767
     short unsigned int moisture_sensor;   // 0 - 65,535
-    int heartbeat[30];                // -32,768 - 32,767
+    short int heartbeat[60];                // -32,768 - 32,767
 };
 
 //the total size of the struct is 192 bytes

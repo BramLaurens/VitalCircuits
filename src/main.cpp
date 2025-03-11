@@ -117,7 +117,7 @@ void setup() {
 
 
 	// fill test_data
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < 60; i++)
 	{
 		test_data.pressure_sensor[i] = i;
 		test_data.heartbeat[i] = i;
@@ -150,6 +150,11 @@ void setup() {
 
   //Set LoRa module config
   SetLoRaConfig();
+
+  // set new serial speed
+  Serial2.flush();
+  Serial2.end();
+  Serial2.begin(115200);
 }
 
 void loop() {
@@ -166,11 +171,17 @@ void loop() {
     }
   }
   if (Serial.available()) {
-      String input = Serial.readString();
-      Serial.println("Sent:" + input);
+      //String input = Serial.readString();
+      Serial.print("Sent message");
+	  Serial.print(" (");
+	  Serial.print(millis());
+	  Serial.println(")");
       ResponseStatus rs = e220ttl.sendMessage((uint8_t*)&message, sizeof(message));
 
-      Serial.println(rs.getResponseDescription());
+      Serial.print(rs.getResponseDescription());
+	  Serial.print(" (");
+	  Serial.print(millis());
+	  Serial.println(")");
   }
 }
 
@@ -190,8 +201,8 @@ void SetLoRaConfig(){
 
 	configuration.CHAN = 18; // Communication channel
 
-	configuration.SPED.uartBaudRate = UART_BPS_9600; // Serial baud rate
-	configuration.SPED.airDataRate = AIR_DATA_RATE_010_24; // Air baud rate
+	configuration.SPED.uartBaudRate = UART_BPS_115200; // Serial baud rate
+	configuration.SPED.airDataRate = AIR_DATA_RATE_111_625; // Air baud rate
 	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
 
 	configuration.OPTION.subPacketSetting = SPS_200_00; // Packet size

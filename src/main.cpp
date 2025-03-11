@@ -24,52 +24,8 @@
 #include "Arduino.h"
 #include "LoRa_E220.h"
 
-
-// ---------- esp8266 pins --------------
-//LoRa_E220 e220ttl(RX, TX, AUX, M0, M1);  // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(D3, D4, D5, D7, D6); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX AUX M0 M1
-//LoRa_E220 e220ttl(D2, D3); // Config without connect AUX and M0 M1
-
-//#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(D2, D3); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(&mySerial, D5, D7, D6); // AUX M0 M1
-// -------------------------------------
-
-// ---------- Arduino pins --------------
-//LoRa_E220 e220ttl(4, 5, 3, 7, 6); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX AUX M0 M1
-//LoRa_E220 e220ttl(4, 5); // Config without connect AUX and M0 M1
-
-//#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(4, 5); // Arduino RX <-- e220 TX, Arduino TX --> e220 RX
-//LoRa_E220 e220ttl(&mySerial, 3, 7, 6); // AUX M0 M1
-// -------------------------------------
-
-// ------------- Arduino Nano 33 IoT -------------
-// LoRa_E220 e220ttl(&Serial1, 2, 4, 6); //  RX AUX M0 M1
-// -------------------------------------------------
-
-// ------------- Arduino MKR WiFi 1010 -------------
-// LoRa_E220 e220ttl(&Serial1, 0, 2, 4); //  RX AUX M0 M1
-// -------------------------------------------------
-
 // ---------- esp32 pins --------------
 LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
-
-//LoRa_E220 e220ttl(&Serial2, 22, 4, 18, 21, 19, UART_BPS_RATE_9600); //  esp32 RX <-- e220 TX, esp32 TX --> e220 RX AUX M0 M1
-// -------------------------------------
-
-// ---------- Raspberry PI Pico pins --------------
-// LoRa_E220 e220ttl(&Serial2, 2, 10, 11); //  RX AUX M0 M1
-// -------------------------------------
-
-// ---------------- STM32 --------------------
-//HardwareSerial Serial2(USART2);   // PA3  (RX)  PA2  (TX)
-//LoRa_E220 e220ttl(&Serial2, PA0, PB0, PB10); //  RX AUX M0 M1
-// -------------------------------------------------
-
-void printParameters(struct Configuration configuration);
-void printModuleInformation(struct ModuleInformation moduleInformation);
-void SetLoRaConfig();
 
 
 // Define the struct for the message
@@ -80,15 +36,6 @@ struct sensordata_struct
     short unsigned int moisture_sensor;   // 0 - 65,535
     short int heartbeat[60];                // -32,768 - 32,767
 };
-
-//the total size of the struct is 192 bytes
-// explanation
-// 60 bytes for pressure_sensor
-// 2 bytes for temperature_sensor
-// 2 bytes for moisture_sensor
-// 120 bytes for heartbeat
-// 8 bytes for the rest of the struct
-
 
 struct message_struct
 {
@@ -102,6 +49,13 @@ struct message_struct
   char lrc;   
   char eot;
 };
+
+void printParameters(struct Configuration configuration);
+void printModuleInformation(struct ModuleInformation moduleInformation);
+void SetLoRaConfig();
+
+int check_LRC(message_struct message);
+int count_bits(int num);
 
 sensordata_struct test_data;
 message_struct message; 
@@ -236,4 +190,45 @@ void printModuleInformation(struct ModuleInformation moduleInformation) {
 	Serial.print(F("Features : "));  Serial.println(moduleInformation.features, HEX);
 	Serial.println("----------------------------------------");
 
+}
+
+
+// A function that counts all bits in the whole message.
+int check_LRC(message_struct message_lrc_check) {
+	int tot = 0;
+
+	tot += count_bits(message_lrc_check.soc);
+	tot += count_bits(message_lrc_check.pl);
+	tot += count_bits(message_lrc_check.src_ID);
+	tot += count_bits(message_lrc_check.des_ID);
+	tot += count_bits(message_lrc_check.pc);
+	tot += count_bits(message_lrc_check.functiecode);
+	tot += count_bits(message_lrc_check.lrc);
+	tot += count_bits(message_lrc_check.eot);
+	tot += count_bits(message_lrc_check.data.moisture_sensor);
+	tot += count_bits(message_lrc_check.data.temperature_sensor);
+
+	for (char i = 0; i < 59; i++) {
+		tot += count_bits(message_lrc_check.data.pressure_sensor[i]);
+		tot += count_bits(message_lrc_check.data.heartbeat[i]);
+	}
+
+	// TODO add if statemtn here.
+	return tot;
+}
+
+// A function that counts all bits in a number.
+int count_bits(int num) {
+	int tot = 0;
+
+	while (num) {
+		if (num & 0x01) {
+			// if LSB is 1, tot++
+			tot++;
+		}
+
+		// Shift all bits 1 to the right
+		num >>= 1;          
+	}
+	return tot;
 }

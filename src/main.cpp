@@ -66,7 +66,7 @@ message_struct message;
 
 void setup()
 {
-	Serial.begin(9600);
+	Serial.begin(115200);
 	Serial2.begin(9600, SERIAL_8N1, 16, 17);
 	while (!Serial)
 	{

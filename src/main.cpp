@@ -30,7 +30,18 @@ struct message_struct
   char eot;
 };
 
-int calculatedLRC = 0;
+struct message_ack 
+{
+	char soc;
+  	char pl;
+  	char src_ID;
+	char des_ID;
+	unsigned char p_ID;
+	char functiecode;
+	char ack_ID;
+	int lrc;
+	char eot;
+};
 
 //Prototypes
 void printParameters(struct Configuration configuration);
@@ -38,11 +49,11 @@ void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 void ReceiveLoRa();
 void GetLoRaConfig();
+void acknowledgeLoRa();
+void send_message_ack();
 
 int check_LRC(message_struct message);
 int count_bits(int num);
-
-sensordata_struct test_data;
 
 void setup()
 {
@@ -77,6 +88,7 @@ void setup()
 
 void loop()
 {
+	//Fill received struct with data
 	ReceiveLoRa();
 }
 
@@ -184,6 +196,8 @@ void ReceiveLoRa(){
 			// Print the data received
 			Serial.print(" - Time: ");
 			Serial.print(millis());
+			Serial.print(" - RSSI:	");
+			//Serial.print(rsc.rssi);
 			Serial.print(" - received p_ID: ");
 			Serial.print(recieved_message.p_ID, DEC);
 			Serial.print(" - recieved src_ID: ");
@@ -196,16 +210,16 @@ void ReceiveLoRa(){
 			Serial.print(check_LRC(recieved_message));
 
 			Serial.print(" - Calculated LRC:");
-			Serial.println(calculatedLRC);
-
+			Serial.println(create_LRC(recieved_message));
 		}
 		rsc.close();
+		acknowledgeLoRa();
 	}
 }
 // A function that counts all bits in the whole message.
-int check_LRC(message_struct message)
+int create_LRC(message_struct message)
 {
-	calculatedLRC = 0;
+	int calculatedLRC = 0;
 	calculatedLRC += count_bits(message.soc);
 	calculatedLRC += count_bits(message.pl);
 	calculatedLRC += count_bits(message.src_ID);
@@ -222,7 +236,22 @@ int check_LRC(message_struct message)
 		calculatedLRC += count_bits(message.data.heartbeat[i]);
 	}
 
-	return calculatedLRC == message.lrc;
+	return calculatedLRC;
+}
+
+int create_LRC_ACK(message_ack message)
+{
+	int calculatedLRC = 0;
+	calculatedLRC += count_bits(message.soc);
+	calculatedLRC += count_bits(message.pl);
+	calculatedLRC += count_bits(message.src_ID);
+	calculatedLRC += count_bits(message.des_ID);
+	calculatedLRC += count_bits(message.p_ID);
+	calculatedLRC += count_bits(message.functiecode);
+	calculatedLRC += count_bits(message.eot);
+	calculatedLRC += count_bits(message.ack_ID);
+
+	return calculatedLRC;
 }
 
 // A function that counts all bits in a number.
@@ -242,4 +271,25 @@ int count_bits(int num)
 		num >>= 1;
 	}
 	return tot;
+}
+
+void acknowledgeLoRa(){
+	message_ack ack_message;
+
+	ack_message.soc = 0x7E;
+	ack_message.pl = sizeof(ack_message) - sizeof(ack_message.lrc);
+	ack_message.functiecode = 0x05;
+	ack_message.src_ID = 0x04;
+	ack_message.des_ID = 0x04;
+	ack_message.p_ID = 0x01;
+	ack_message.lrc = create_LRC_ACK(ack_message);
+
+	send_message_ack(ack_message);
+}
+
+void send_message_ack(message_ack message){
+	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message_ack));
+	Serial.println(rs.getResponseDescription());
+	Serial.println(rs.code);
+
 }

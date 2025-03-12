@@ -100,11 +100,20 @@ void loop()
 		else
 		{
 			// Print the data received
+
+			Serial.print("recieved lrc: ");
+			Serial.print(message.lrc);
+			Serial.print(" - match with calculated: ");
+			Serial.println(check_LRC(recieved_message));
+
+			/*
+			
 			for (int i = 0; i < 60; i++)
 			{
 				Serial.println(recieved_message.data.heartbeat[i]);
 			}
 			Serial.println(recieved_message.des_ID, HEX);
+			*/
 		}
 	}
 	if (Serial.available())
@@ -219,8 +228,7 @@ int check_LRC(message_struct message)
 		tot += count_bits(message.data.heartbeat[i]);
 	}
 
-	// TODO add if statemtn here.
-	return tot;
+	return tot == message.lrc;
 }
 
 // A function that counts all bits in a number.

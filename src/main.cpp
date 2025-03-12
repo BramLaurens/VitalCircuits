@@ -86,16 +86,14 @@ void setup()
 	test_data.temperature_sensor = 12345;
 	test_data.moisture_sensor = 54321;
 
-	// fill message
-	message.soc = 0x01;
-	message.pl = 0x01;
-	message.src_ID = 0x01;
-	message.des_ID = 0x07;
-	message.p_ID = 0x00;
-	message.functiecode = 0x01;
-	message.data = test_data;
+	// Fill message
+	message.soc = 0x7E; 								// Self chosen value
+	message.src_ID = 0x04;								// Source ID - 0000 0001 In our case (EV1A Group 4)
+	message.des_ID = 0x04;								// Destination ID - 0000 0111 In our case (EV1A Group 4)
+	message.p_ID = 0x00;								// Package ID - Starts at 0
+	message.eot = 0xA4; 								// Self chosen value
+	message.pl = sizeof(message) - sizeof(message.lrc);						// Payload length - 1 byte
 
-	message.eot = 0x03;
 
 	message.lrc = create_LRC(message);
 	
@@ -117,6 +115,7 @@ void setup()
 	// Set LoRa module config
 	// SetLoRaConfig();
 
+	
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
@@ -139,6 +138,9 @@ void loop()
 {
 	if (Serial.available())
 	{
+		message.data = test_data;
+		message.functiecode = 0x02;		// Send data
+		Serial.println(message.p_ID, DEC);
 		send_message(message);
 
 		// Increase the package ID (For testing purposes)
@@ -154,12 +156,18 @@ void send_message(message_struct message)
 	
 	// Create LRC
 	message.lrc = create_LRC(message);
+
+
+	// Debug message
+	/*
 	Serial.print("LRC: ");
 	Serial.print(message.lrc, DEC);
 	Serial.print(" - p_ID: ");
 	Serial.print(message.p_ID, DEC);
 	Serial.print(" - Bin: ");
 	Serial.println(message.p_ID, BIN);
+	*/
+	// END Debug message
 
 	
 	// Debug message
@@ -171,6 +179,7 @@ void send_message(message_struct message)
 
 
 	// Send message
+	// NOTE - This function blocks the program until there is a response
 	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message));
 
 	

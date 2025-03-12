@@ -58,87 +58,92 @@ int check_LRC(message_struct message);
 int count_bits(int num);
 
 sensordata_struct test_data;
-message_struct message; 
+message_struct message;
 
-
-void setup() {
+void setup()
+{
 	Serial.begin(9600);
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
-	while(!Serial){};
+	Serial2.begin(9600, SERIAL_8N1, 16, 17);
+	while (!Serial)
+	{
+	};
 	delay(500);
 
 	Serial.println();
 
-
 	// Startup all pins and UART
 	e220ttl.begin();
 
-  //Set LoRa module config
-  SetLoRaConfig();
+	// Set LoRa module config
+	SetLoRaConfig();
 
-  // set new serial speed
-  Serial2.flush();
-  Serial2.end();
-  Serial2.begin(115200);
-
+	// set new serial speed
+	Serial2.flush();
+	Serial2.end();
+	Serial2.begin(115200);
 }
 
-void loop() {
-    // If something available
-  if (e220ttl.available()>1) {
-      // read the String message
-    ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message));
-	message_struct recieved_message = *(message_struct*) rsc.data;
+void loop()
+{
+	// If something available
+	if (e220ttl.available() > 1)
+	{
+		// read the String message
+		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message));
+		message_struct recieved_message = *(message_struct *)rsc.data;
 
-    // Is something goes wrong print error
-    if (rsc.status.code!=1){
-        Serial.println(rsc.status.getResponseDescription());
-    }else{
-        // Print the data received
-		for (int i = 0; i < 60; i++) 
+		// Is something goes wrong print error
+		if (rsc.status.code != 1)
 		{
-			Serial.println(recieved_message.data.heartbeat[i]);
+			Serial.println(rsc.status.getResponseDescription());
 		}
-        Serial.println(recieved_message.des_ID, HEX);
-
-    }
-  }
-  if (Serial.available()) {
-      String input = Serial.readString();
-      Serial.println("Sent:" + input);
-      ResponseStatus rs = e220ttl.sendMessage(input);
-      Serial.println(rs.getResponseDescription());
-  }
+		else
+		{
+			// Print the data received
+			for (int i = 0; i < 60; i++)
+			{
+				Serial.println(recieved_message.data.heartbeat[i]);
+			}
+			Serial.println(recieved_message.des_ID, HEX);
+		}
+	}
+	if (Serial.available())
+	{
+		String input = Serial.readString();
+		Serial.println("Sent:" + input);
+		ResponseStatus rs = e220ttl.sendMessage(input);
+		Serial.println(rs.getResponseDescription());
+	}
 }
 
-void SetLoRaConfig(){
-  ResponseStructContainer c;
+void SetLoRaConfig()
+{
+	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
-	Configuration configuration = *(Configuration*) c.data;
+	Configuration configuration = *(Configuration *)c.data;
 	Serial.println(c.status.getResponseDescription());
 	Serial.println(c.status.code);
 
 	printParameters(configuration);
 
-
-	configuration.ADDL = 0x03;  // First part of address
+	configuration.ADDL = 0x03; // First part of address
 	configuration.ADDH = 0x00; // Second part
 
 	configuration.CHAN = 18; // Communication channel
 
-	configuration.SPED.uartBaudRate = UART_BPS_115200; // Serial baud rate
+	configuration.SPED.uartBaudRate = UART_BPS_115200;		// Serial baud rate
 	configuration.SPED.airDataRate = AIR_DATA_RATE_111_625; // Air baud rate
-	configuration.SPED.uartParity = MODE_00_8N1; // Parity bit
+	configuration.SPED.uartParity = MODE_00_8N1;			// Parity bit
 
-	configuration.OPTION.subPacketSetting = SPS_200_00; // Packet size
+	configuration.OPTION.subPacketSetting = SPS_200_00;					 // Packet size
 	configuration.OPTION.RSSIAmbientNoise = RSSI_AMBIENT_NOISE_DISABLED; // Need to send special command
-	configuration.OPTION.transmissionPower = POWER_22; // Device power
+	configuration.OPTION.transmissionPower = POWER_22;					 // Device power
 
-	configuration.TRANSMISSION_MODE.enableRSSI = RSSI_DISABLED; // Enable RSSI info
+	configuration.TRANSMISSION_MODE.enableRSSI = RSSI_DISABLED;						 // Enable RSSI info
 	configuration.TRANSMISSION_MODE.fixedTransmission = FT_TRANSPARENT_TRANSMISSION; // Enable repeater mode
-	configuration.TRANSMISSION_MODE.enableLBT = LBT_DISABLED; // Check interference
-	configuration.TRANSMISSION_MODE.WORPeriod = WOR_2000_011; // WOR timing
+	configuration.TRANSMISSION_MODE.enableLBT = LBT_DISABLED;						 // Check interference
+	configuration.TRANSMISSION_MODE.WORPeriod = WOR_2000_011;						 // WOR timing
 
 	// Set configuration changed and set to not hold the configuration
 	ResponseStatus rs = e220ttl.setConfiguration(configuration, WRITE_CFG_PWR_DWN_SAVE);
@@ -147,7 +152,7 @@ void SetLoRaConfig(){
 
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
-	configuration = *(Configuration*) c.data;
+	configuration = *(Configuration *)c.data;
 	Serial.println(c.status.getResponseDescription());
 	Serial.println(c.status.code);
 
@@ -192,25 +197,26 @@ void printModuleInformation(struct ModuleInformation moduleInformation) {
 
 }
 
-
 // A function that counts all bits in the whole message.
-int check_LRC(message_struct message_lrc_check) {
+int check_LRC(message_struct message)
+{
 	int tot = 0;
 
-	tot += count_bits(message_lrc_check.soc);
-	tot += count_bits(message_lrc_check.pl);
-	tot += count_bits(message_lrc_check.src_ID);
-	tot += count_bits(message_lrc_check.des_ID);
-	tot += count_bits(message_lrc_check.pc);
-	tot += count_bits(message_lrc_check.functiecode);
-	tot += count_bits(message_lrc_check.lrc);
-	tot += count_bits(message_lrc_check.eot);
-	tot += count_bits(message_lrc_check.data.moisture_sensor);
-	tot += count_bits(message_lrc_check.data.temperature_sensor);
+	tot += count_bits(message.soc);
+	tot += count_bits(message.pl);
+	tot += count_bits(message.src_ID);
+	tot += count_bits(message.des_ID);
+	tot += count_bits(message.pc);
+	tot += count_bits(message.functiecode);
+	tot += count_bits(message.lrc);
+	tot += count_bits(message.eot);
+	tot += count_bits(message.data.moisture_sensor);
+	tot += count_bits(message.data.temperature_sensor);
 
-	for (char i = 0; i < 59; i++) {
-		tot += count_bits(message_lrc_check.data.pressure_sensor[i]);
-		tot += count_bits(message_lrc_check.data.heartbeat[i]);
+	for (char i = 0; i < 59; i++)
+	{
+		tot += count_bits(message.data.pressure_sensor[i]);
+		tot += count_bits(message.data.heartbeat[i]);
 	}
 
 	// TODO add if statemtn here.
@@ -218,17 +224,20 @@ int check_LRC(message_struct message_lrc_check) {
 }
 
 // A function that counts all bits in a number.
-int count_bits(int num) {
+int count_bits(int num)
+{
 	int tot = 0;
 
-	while (num) {
-		if (num & 0x01) {
+	while (num)
+	{
+		if (num & 0x01)
+		{
 			// if LSB is 1, tot++
 			tot++;
 		}
 
 		// Shift all bits 1 to the right
-		num >>= 1;          
+		num >>= 1;
 	}
 	return tot;
 }

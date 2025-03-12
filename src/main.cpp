@@ -62,7 +62,9 @@ message_struct message;
 
 void setup()
 {
+	//Set serial for debugging
 	Serial.begin(9600);
+	//Set serial for configuration
 	Serial2.begin(9600, SERIAL_8N1, 16, 17);
 	while (!Serial)
 	{
@@ -73,11 +75,26 @@ void setup()
 
 	// Startup all pins and UART
 	e220ttl.begin();
+	ResponseStatus rs = e220ttl.resetModule();
+	Serial.println("Resetting:");
+	Serial.println(rs.getResponseDescription());
+	Serial.println(rs.code);
+	e220ttl.setMode(MODE_0_NORMAL);
 
-	// Set LoRa module config
-	SetLoRaConfig();
+	//Set LoRa module config
+	//SetLoRaConfig();
 
-	// set new serial speed
+	ResponseStructContainer c;
+	c = e220ttl.getConfiguration();
+	Configuration configuration = *(Configuration *)c.data;
+	// It's important get configuration pointer before all other operation
+	Serial.println(c.status.getResponseDescription());
+	Serial.println(c.status.code);
+
+	printParameters(configuration);
+	c.close();
+
+	// set new serial speed for TXRX
 	Serial2.flush();
 	Serial2.end();
 	Serial2.begin(115200);
@@ -86,7 +103,7 @@ void setup()
 void loop()
 {
 	// If something available
-	if (e220ttl.available() > 1)
+	if (e220ttl.available())
 	{
 		// read the String message
 		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message));
@@ -95,6 +112,7 @@ void loop()
 		// Is something goes wrong print error
 		if (rsc.status.code != 1)
 		{
+			Serial.print("Error with RSC:");
 			Serial.println(rsc.status.getResponseDescription());
 		}
 		else
@@ -115,13 +133,7 @@ void loop()
 			Serial.println(recieved_message.des_ID, HEX);
 			*/
 		}
-	}
-	if (Serial.available())
-	{
-		String input = Serial.readString();
-		Serial.println("Sent:" + input);
-		ResponseStatus rs = e220ttl.sendMessage(input);
-		Serial.println(rs.getResponseDescription());
+		rsc.close();
 	}
 }
 
@@ -158,15 +170,6 @@ void SetLoRaConfig()
 	ResponseStatus rs = e220ttl.setConfiguration(configuration, WRITE_CFG_PWR_DWN_SAVE);
 	Serial.println(rs.getResponseDescription());
 	Serial.println(rs.code);
-
-	c = e220ttl.getConfiguration();
-	// It's important get configuration pointer before all other operation
-	configuration = *(Configuration *)c.data;
-	Serial.println(c.status.getResponseDescription());
-	Serial.println(c.status.code);
-
-	printParameters(configuration);
-	c.close();
 }
 
 void printParameters(struct Configuration configuration) {

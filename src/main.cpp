@@ -45,17 +45,19 @@ struct message_struct
   char pl;
   char src_ID;
   char des_ID;
-  char pc;
+  unsigned char p_ID;
   char functiecode;
   sensordata_struct data;
   int lrc;   
   char eot;
 };
 
+sensordata_struct sensordata_buffer[256];
 
 void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
+void send_message(message_struct message);
 
 int create_LRC(message_struct message);
 int count_bits(int num);
@@ -89,7 +91,7 @@ void setup()
 	message.pl = 0x01;
 	message.src_ID = 0x01;
 	message.des_ID = 0x07;
-	message.pc = 0x01;
+	message.p_ID = 0x00;
 	message.functiecode = 0x01;
 	message.data = test_data;
 
@@ -129,45 +131,58 @@ void setup()
 	Serial2.flush();
 	Serial2.end();
 	Serial2.begin(115200);
+
+	Serial.println(sizeof(sensordata_buffer));
 }
 
 void loop()
 {
-	// If something available
-	if (e220ttl.available() > 1)
-	{
-		// read the String message
-		ResponseContainer rc = e220ttl.receiveMessage();
-		// Is something goes wrong print error
-		if (rc.status.code != 1)
-		{
-			Serial.println(rc.status.getResponseDescription());
-		}
-		else
-		{
-			// Print the data received
-			Serial.println(rc.data);
-		}
-	}
 	if (Serial.available())
 	{
+		send_message(message);
 
-		message.lrc = create_LRC(message);
-
-		// String input = Serial.readString();
-		
-		Serial.print("Sent message");
-		Serial.print(" (");
-		Serial.print(millis());
-		Serial.print(") ");
-		Serial.println(message.lrc);
-		ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message));
-		
-		Serial.print(rs.getResponseDescription());
-		Serial.print(" (");
-		Serial.print(millis());
-		Serial.println(")");
+		// Increase the package ID (For testing purposes)
+		message.p_ID++;
 	}
+}
+
+void send_message(message_struct message) 
+{
+	// Save sensor data
+	sensordata_buffer[message.p_ID] = message.data;
+
+	
+	// Create LRC
+	message.lrc = create_LRC(message);
+	Serial.print("LRC: ");
+	Serial.print(message.lrc, DEC);
+	Serial.print(" - p_ID: ");
+	Serial.print(message.p_ID, DEC);
+	Serial.print(" - Bin: ");
+	Serial.println(message.p_ID, BIN);
+
+	
+	// Debug message
+	Serial.print("Sent message (t: ");
+	int timer = millis();
+	Serial.print(timer);
+	Serial.print(") - Status: ");
+	// END Debug message
+
+
+	// Send message
+	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message));
+
+	
+	// Debug message
+	Serial.print(rs.getResponseDescription());
+	Serial.print(" (t: ");
+	Serial.print(millis());
+	Serial.print(") - Diff: (");
+	Serial.print(millis() - timer);
+	Serial.println(")");
+	// END Debug message
+	
 }
 
 void SetLoRaConfig()
@@ -264,9 +279,9 @@ int create_LRC(message_struct message)
 	tot += count_bits(message.pl);
 	tot += count_bits(message.src_ID);
 	tot += count_bits(message.des_ID);
-	tot += count_bits(message.pc);
+	tot += count_bits(message.p_ID);
 	tot += count_bits(message.functiecode);
-	tot += count_bits(message.lrc);
+	//tot += count_bits(message.lrc);
 	tot += count_bits(message.eot);
 	tot += count_bits(message.data.moisture_sensor);
 	tot += count_bits(message.data.temperature_sensor);

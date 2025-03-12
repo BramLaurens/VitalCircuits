@@ -29,6 +29,7 @@
 LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
 
 
+
 // Define the struct for the message
 struct sensordata_struct
 {
@@ -95,8 +96,7 @@ void setup()
 	message.eot = 0x03;
 
 	message.lrc = create_LRC(message);
-	;
-
+	
 	Serial.print("Size of message: ");
 	Serial.println(sizeof(message));
 
@@ -109,8 +109,21 @@ void setup()
 	// Startup all pins and UART
 	e220ttl.begin();
 
+	// Set e220 to normal mode
+	e220ttl.setMode(MODE_0_NORMAL);
+	
 	// Set LoRa module config
-	SetLoRaConfig();
+	// SetLoRaConfig();
+
+	ResponseStructContainer c;
+	c = e220ttl.getConfiguration();
+	// It's important get configuration pointer before all other operation
+	Configuration configuration = *(Configuration *)c.data;
+	Serial.println(c.status.getResponseDescription());
+	Serial.println(c.status.code);
+
+	printParameters(configuration);
+	c.close();
 
 	// set new serial speed
 	Serial2.flush();
@@ -138,13 +151,18 @@ void loop()
 	}
 	if (Serial.available())
 	{
+
+		message.lrc = create_LRC(message);
+
 		// String input = Serial.readString();
+		
 		Serial.print("Sent message");
 		Serial.print(" (");
 		Serial.print(millis());
-		Serial.println(")");
+		Serial.print(") ");
+		Serial.println(message.lrc);
 		ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message));
-
+		
 		Serial.print(rs.getResponseDescription());
 		Serial.print(" (");
 		Serial.print(millis());
@@ -194,6 +212,8 @@ void SetLoRaConfig()
 
 	printParameters(configuration);
 	c.close();
+
+	
 }
 
 void printParameters(struct Configuration configuration) 

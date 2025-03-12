@@ -41,15 +41,29 @@ struct sensordata_struct
 
 struct message_struct
 {
-  char soc;
-  char pl;
-  char src_ID;
-  char des_ID;
-  unsigned char p_ID;
-  char functiecode;
-  sensordata_struct data;
-  int lrc;   
-  char eot;
+	char soc;
+	char pl;
+	char src_ID;
+	char des_ID;
+	unsigned char p_ID;
+	char functiecode;
+	sensordata_struct data;
+	int lrc;   
+char eot;
+};
+
+
+struct message_ack_struct
+{
+	char soc;
+  	char pl;
+  	char src_ID;
+  	char des_ID;
+  	unsigned char p_ID;
+  	char functiecode;
+	char ack_ID;
+ 	int lrc;   
+  	char eot;
 };
 
 sensordata_struct sensordata_buffer[256];
@@ -58,13 +72,19 @@ void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
 void send_message(message_struct message);
+bool ReceiveLoRa();
 
 int create_LRC(message_struct message);
 int count_bits(int num);
 
-
+// Create a sensordata struct with testdata, this will later be filled with real sensor data
 sensordata_struct test_data;
+
+// Create a message struct to store the message to be sent
 message_struct message;
+
+// Create a message struct to store the received message
+message_ack_struct recieved_message;
 
 void setup()
 {
@@ -86,25 +106,22 @@ void setup()
 	test_data.temperature_sensor = 12345;
 	test_data.moisture_sensor = 54321;
 
+
 	// Fill message
-	message.soc = 0x7E; 								// Self chosen value
-	message.src_ID = 0x04;								// Source ID - 0000 0001 In our case (EV1A Group 4)
-	message.des_ID = 0x04;								// Destination ID - 0000 0111 In our case (EV1A Group 4)
-	message.p_ID = 0x00;								// Package ID - Starts at 0
-	message.eot = 0xA4; 								// Self chosen value
-	message.pl = sizeof(message) - sizeof(message.lrc);						// Payload length - 1 byte
-
-
-	message.lrc = create_LRC(message);
+	message.soc = 0x7E; 									// Self chosen value
+	message.src_ID = 0x04;									// Source ID - 0000 0001 In our case (EV1A Group 4)
+	message.des_ID = 0x04;									// Destination ID - 0000 0111 In our case (EV1A Group 4)
+	message.p_ID = 0x00;									// Package ID - Starts at 0
+	message.eot = 0xA4; 									// Self chosen value
+	message.pl = sizeof(message) - sizeof(message.lrc);		// Payload length - 1 byte
+	message.lrc = create_LRC(message);						// LRC - Integrity check
 	
+	
+	// Debug message
 	Serial.print("Size of message: ");
 	Serial.println(sizeof(message));
+	// END Debug message
 
-	Serial.print("LRC: ");
-	Serial.println(message.lrc, DEC);
-
-	Serial.print("heartbeat 25: ");
-	Serial.println(message.data.heartbeat[24]);
 
 	// Startup all pins and UART
 	e220ttl.begin();
@@ -115,7 +132,7 @@ void setup()
 	// Set LoRa module config
 	// SetLoRaConfig();
 
-	
+
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
@@ -132,21 +149,56 @@ void setup()
 	Serial2.begin(115200);
 
 	Serial.println(sizeof(sensordata_buffer));
+
+
+
+	// Send initial message
+	message.data = test_data;
+	message.functiecode = 0x02;		// Send data
+	Serial.println(message.p_ID, DEC);
+	send_message(message);
+
 }
+
+
+
+
+
 
 void loop()
 {
-	if (Serial.available())
+	// Wait for response
+	while (!ReceiveLoRa()) 
+
+	if (recieved_message.functiecode == 0x5 && recieved_message.lrc == create_LRC_ack(recieved_message))
 	{
-		message.data = test_data;
+		// recieved ackowledge - sending next package
+		message.data = test_data; 		// Needs to be changed to the real sensor data
 		message.functiecode = 0x02;		// Send data
-		Serial.println(message.p_ID, DEC);
 		send_message(message);
 
 		// Increase the package ID (For testing purposes)
 		message.p_ID++;
 	}
+	else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
+	{
+		// recieved retransmit - sending the requested package
+		message.data = sensordata_buffer[recieved_message.ack_ID];
+		message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
+		message.p_ID = recieved_message.ack_ID;
+		send_message(message);
+
+		// KNOWN ISSUE - message.p_ID is fucked when retransmitting
+	}
+
+	else {
+		// Error
+		Serial.println('WHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+		while(1);
+	}
 }
+
+
 
 void send_message(message_struct message) 
 {
@@ -193,6 +245,50 @@ void send_message(message_struct message)
 	// END Debug message
 	
 }
+
+bool ReceiveLoRa(){
+	// If something available
+	if (e220ttl.available())
+	{
+		// read the String message
+		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message_ack_struct));
+		recieved_message = *(message_ack_struct *)rsc.data;
+
+		// Is something goes wrong print error
+		if (rsc.status.code != 1)
+		{
+			Serial.print("Error with RSC:");
+			Serial.println(rsc.status.getResponseDescription());
+		}
+		else
+		{
+			// Print the data received
+			Serial.print(" - Time: ");
+			Serial.print(millis());
+			Serial.print(" - received p_ID: ");
+			Serial.print(recieved_message.p_ID, DEC);
+			Serial.print(" - recieved src_ID: ");
+			Serial.print(recieved_message.src_ID, DEC);
+			Serial.print(" - received des_ID: ");
+			Serial.print(recieved_message.des_ID, DEC);
+			Serial.print(" - recieved lrc: ");
+			Serial.print(recieved_message.lrc);
+			Serial.print(" - match with calculated: ");
+			Serial.print(create_LRC_ack(recieved_message) == recieved_message.lrc);
+
+			Serial.print(" - Calculated LRC:");
+			Serial.println(create_LRC_ack(recieved_message));
+
+		}
+		rsc.close();
+		return true;
+	}
+	else 
+	{
+		return false;
+	}
+}
+
 
 void SetLoRaConfig()
 {
@@ -279,8 +375,8 @@ void printModuleInformation(struct ModuleInformation moduleInformation)
 
 }
 
-// A function that counts all bits in the whole message.
-int create_LRC(message_struct message)
+// A function that counts all bits in the acknowledge struct.
+int create_LRC_ack(message_ack_struct message)
 {
 	int tot = 0;
 
@@ -290,16 +386,8 @@ int create_LRC(message_struct message)
 	tot += count_bits(message.des_ID);
 	tot += count_bits(message.p_ID);
 	tot += count_bits(message.functiecode);
-	//tot += count_bits(message.lrc);
+	tot += count_bits(message.ack_ID);
 	tot += count_bits(message.eot);
-	tot += count_bits(message.data.moisture_sensor);
-	tot += count_bits(message.data.temperature_sensor);
-
-	for (char i = 0; i < 59; i++)
-	{
-		tot += count_bits(message.data.pressure_sensor[i]);
-		tot += count_bits(message.data.heartbeat[i]);
-	}
 
 	return tot;
 }

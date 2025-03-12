@@ -31,10 +31,10 @@ LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
 // Define the struct for the message
 struct sensordata_struct
 {
-    unsigned char pressure_sensor[60];        // 0 - 255
+    unsigned char pressure_sensor[59];        // 0 - 255
     int temperature_sensor;               // -32,768 - 32,767
     short unsigned int moisture_sensor;   // 0 - 65,535
-    short int heartbeat[60];                // -32,768 - 32,767
+    short int heartbeat[59];                // -32,768 - 32,767
 };
 
 struct message_struct
@@ -46,7 +46,7 @@ struct message_struct
   char pc;
   char functiecode;
   sensordata_struct data;
-  char lrc;   
+  int lrc;   
   char eot;
 };
 

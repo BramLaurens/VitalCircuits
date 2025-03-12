@@ -43,16 +43,24 @@ struct message_ack
 	char eot;
 };
 
+message_struct recieved_message;
+message_struct verifiedMessage;
+
+message_ack ack_message;
+
 //Prototypes
 void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig();
-void ReceiveLoRa();
+bool ReceiveLoRa();
 void GetLoRaConfig();
 void acknowledgeLoRa();
-void send_message_ack();
+void send_message_ack(message_ack message);
+bool verify_message();
+void retransmitReq();
 
-int check_LRC(message_struct message);
+int create_LRC(message_struct message);
+int create_LRC_ACK(message_ack message);
 int count_bits(int num);
 
 void setup()
@@ -88,8 +96,21 @@ void setup()
 
 void loop()
 {
-	//Fill received struct with data
-	ReceiveLoRa();
+	//If received message, fill temp struct, and verify
+	if(ReceiveLoRa()){
+
+		if(verify_message()){
+			// Acknowledge message received succesfully
+			Serial.println("Verification successful, sending acknowledgement");
+			acknowledgeLoRa();
+			verifiedMessage = recieved_message;
+		}
+		else{
+			// Request retransmit
+			Serial.println("Verification failed, requesting retransmit");
+			retransmitReq();
+		}
+	}
 }
 
 void SetLoRaConfig()
@@ -177,15 +198,16 @@ void printModuleInformation(struct ModuleInformation moduleInformation) {
 
 }
 
-void ReceiveLoRa(){
+bool ReceiveLoRa(){
 	// If something available
 	if (e220ttl.available())
 	{
+		Serial.println("Received message:");
 		// read the String message
 		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message_struct));
-		message_struct recieved_message = *(message_struct *)rsc.data;
+		recieved_message = *(message_struct *)rsc.data;
 
-		// Is something goes wrong print error
+		// If something goes wrong print error
 		if (rsc.status.code != 1)
 		{
 			Serial.print("Error with RSC:");
@@ -207,14 +229,15 @@ void ReceiveLoRa(){
 			Serial.print(" - recieved lrc: ");
 			Serial.print(recieved_message.lrc);
 			Serial.print(" - match with calculated: ");
-			Serial.print(check_LRC(recieved_message));
+			Serial.print(create_LRC(recieved_message) == recieved_message.lrc);
 
 			Serial.print(" - Calculated LRC:");
 			Serial.println(create_LRC(recieved_message));
 		}
 		rsc.close();
-		acknowledgeLoRa();
+		return true;
 	}
+	return false;
 }
 // A function that counts all bits in the whole message.
 int create_LRC(message_struct message)
@@ -273,15 +296,51 @@ int count_bits(int num)
 	return tot;
 }
 
-void acknowledgeLoRa(){
-	message_ack ack_message;
+bool verify_message(){
 
+	if(recieved_message.soc != 0x7E){
+		Serial.println(" - Start of communication not correct");
+		return false;
+	}
+	if(recieved_message.des_ID != 0x04){
+		Serial.println(" - Destination ID not correct");
+		return false;
+	}
+
+	if(recieved_message.src_ID != 0x04){
+		Serial.println(" - Source ID not correct");
+		return false;
+	}
+
+	if(create_LRC(recieved_message) != recieved_message.lrc){
+		Serial.println(" - LRC not correct");
+		return false;
+	}
+
+	return true;
+}
+
+void acknowledgeLoRa(){
 	ack_message.soc = 0x7E;
 	ack_message.pl = sizeof(ack_message) - sizeof(ack_message.lrc);
 	ack_message.functiecode = 0x05;
 	ack_message.src_ID = 0x04;
 	ack_message.des_ID = 0x04;
 	ack_message.p_ID = 0x01;
+	ack_message.ack_ID = recieved_message.p_ID;
+	ack_message.lrc = create_LRC_ACK(ack_message);
+
+	send_message_ack(ack_message);
+}
+
+void retransmitReq(){
+	ack_message.soc = 0x7E;
+	ack_message.pl = sizeof(ack_message) - sizeof(ack_message.lrc);
+	ack_message.functiecode = 0x01;
+	ack_message.src_ID = 0x04;
+	ack_message.des_ID = 0x04;
+	ack_message.p_ID = 0x01;
+	ack_message.ack_ID = recieved_message.p_ID;
 	ack_message.lrc = create_LRC_ACK(ack_message);
 
 	send_message_ack(ack_message);
@@ -289,6 +348,7 @@ void acknowledgeLoRa(){
 
 void send_message_ack(message_ack message){
 	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message_ack));
+	Serial.println("Sent acknowledgement:");
 	Serial.println(rs.getResponseDescription());
 	Serial.println(rs.code);
 

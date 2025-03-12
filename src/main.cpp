@@ -75,6 +75,7 @@ void send_message(message_struct message);
 bool ReceiveLoRa();
 
 int create_LRC(message_struct message);
+int create_LRC_ack(message_ack_struct message);
 int count_bits(int num);
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
@@ -84,7 +85,7 @@ sensordata_struct test_data;
 message_struct message;
 
 // Create a message struct to store the received message
-message_ack_struct recieved_message;
+message_ack_struct recieved_message {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 void setup()
 {
@@ -114,7 +115,7 @@ void setup()
 	message.p_ID = 0x00;									// Package ID - Starts at 0
 	message.eot = 0xA4; 									// Self chosen value
 	message.pl = sizeof(message) - sizeof(message.lrc);		// Payload length - 1 byte
-	message.lrc = create_LRC(message);						// LRC - Integrity check
+	message.lrc = create_LRC(message);					// LRC - Integrity check
 	
 	
 	// Debug message
@@ -137,8 +138,13 @@ void setup()
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
 	Configuration configuration = *(Configuration *)c.data;
-	Serial.println(c.status.getResponseDescription());
+
+	// Print configuration satus
+	Serial.print("Configuration status: ");
+	Serial.print(c.status.getResponseDescription());
+	Serial.print(" - Code: ");
 	Serial.println(c.status.code);
+
 
 	printParameters(configuration);
 	c.close();
@@ -147,57 +153,54 @@ void setup()
 	Serial2.flush();
 	Serial2.end();
 	Serial2.begin(115200);
-
-	Serial.println(sizeof(sensordata_buffer));
-
-
-
-	// Send initial message
-	message.data = test_data;
-	message.functiecode = 0x02;		// Send data
-	Serial.println(message.p_ID, DEC);
-	send_message(message);
-
 }
-
-
-
-
 
 
 void loop()
 {
+	// if (Serial.available()) {
+	// 	// Send initial message
+	// 	message.data = test_data;
+	// 	message.functiecode = 0x02;		// Send data
+	// 	Serial.println(message.p_ID, DEC);
+	// 	send_message(message);
+	// } else {
+		
+	// }
+	
 	// Wait for response
-	while (!ReceiveLoRa()) 
-
-	if (recieved_message.functiecode == 0x5 && recieved_message.lrc == create_LRC_ack(recieved_message))
+	if (ReceiveLoRa()) 
 	{
-		// recieved ackowledge - sending next package
-		message.data = test_data; 		// Needs to be changed to the real sensor data
-		message.functiecode = 0x02;		// Send data
-		send_message(message);
+		// A message was recieved
+		Serial.println("RECIEVED MESSAGE");
+		
+		if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
+		{
+			// recieved ackowledge - sending next package
+			message.data = test_data; 		// Needs to be changed to the real sensor data
+			message.functiecode = 0x02;		// Send data
+			send_message(message);
 
-		// Increase the package ID (For testing purposes)
-		message.p_ID++;
-	}
-	else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
-	{
-		// recieved retransmit - sending the requested package
-		message.data = sensordata_buffer[recieved_message.ack_ID];
-		message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
-		message.p_ID = recieved_message.ack_ID;
-		send_message(message);
+			// Increase the package ID (For testing purposes)
+			message.p_ID++;
+		}
+		else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
+		{
+			// recieved retransmit - sending the requested package
+			message.data = sensordata_buffer[recieved_message.ack_ID];
+			message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
+			message.p_ID = recieved_message.ack_ID;
+			send_message(message);
 
-		// KNOWN ISSUE - message.p_ID is fucked when retransmitting
-	}
+			// KNOWN ISSUE - message.p_ID is fucked when retransmitting
+		}
 
-	else {
-		// Error
-		Serial.println('WHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
-		while(1);
+		else {
+			// Error
+			Serial.println("WHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+		}
 	}
 }
-
 
 
 void send_message(message_struct message) 
@@ -246,6 +249,7 @@ void send_message(message_struct message)
 	
 }
 
+
 bool ReceiveLoRa(){
 	// If something available
 	if (e220ttl.available())
@@ -262,6 +266,7 @@ bool ReceiveLoRa(){
 		}
 		else
 		{
+			/*
 			// Print the data received
 			Serial.print(" - Time: ");
 			Serial.print(millis());
@@ -278,8 +283,9 @@ bool ReceiveLoRa(){
 
 			Serial.print(" - Calculated LRC:");
 			Serial.println(create_LRC_ack(recieved_message));
-
+			*/
 		}
+
 		rsc.close();
 		return true;
 	}
@@ -336,6 +342,7 @@ void SetLoRaConfig()
 	
 }
 
+
 void printParameters(struct Configuration configuration) 
 {
 	DEBUG_PRINTLN("----------------------------------------");
@@ -363,6 +370,8 @@ void printParameters(struct Configuration configuration)
 
 	DEBUG_PRINTLN("----------------------------------------");
 }
+
+
 void printModuleInformation(struct ModuleInformation moduleInformation) 
 {
 	Serial.println("----------------------------------------");
@@ -388,6 +397,29 @@ int create_LRC_ack(message_ack_struct message)
 	tot += count_bits(message.functiecode);
 	tot += count_bits(message.ack_ID);
 	tot += count_bits(message.eot);
+
+	return tot;
+}
+
+// A function that counts all bits in the message struct.
+int create_LRC(message_struct message)
+{
+	int tot = 0;
+	tot += count_bits(message.soc);
+	tot += count_bits(message.pl);
+	tot += count_bits(message.src_ID);
+	tot += count_bits(message.des_ID);
+	tot += count_bits(message.p_ID);
+	tot += count_bits(message.functiecode);
+	tot += count_bits(message.eot);
+	tot += count_bits(message.data.moisture_sensor);
+	tot += count_bits(message.data.temperature_sensor);
+
+	for (char i = 0; i < 59; i++)
+	{
+		tot += count_bits(message.data.pressure_sensor[i]);
+		tot += count_bits(message.data.heartbeat[i]);
+	}
 
 	return tot;
 }

@@ -76,6 +76,7 @@ void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig(); // Unused
 void send_message(message_struct message);
 bool ReceiveLoRa();
+void getLoRaConfig();
 
 int create_LRC(message_struct message);
 int create_LRC_ack(response_message_struct message);
@@ -128,18 +129,17 @@ void setup()
 	// Set e220 to normal mode
 	e220ttl.setMode(MODE_0_NORMAL);
 
+
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
 	Configuration configuration = *(Configuration *)c.data;
 
-	// Print configuration satus and parameters.
-	Serial.print("Configuration status: ");
-	Serial.print(c.status.getResponseDescription());
-	Serial.print(" - Code: ");
-	Serial.println(c.status.code);
-	printParameters(configuration);
-	c.close();
+	// Get configuration
+	getLoRaConfig();
+
+	// Set configuration
+	SetLoRaConfig();
 
 
 	// set new serial speed (e220 needs 9600 to config and sends data on 115200)
@@ -458,4 +458,17 @@ int count_bits(int num)
 	}
 
 	return tot;
+}
+
+void getLoRaConfig()
+{
+	ResponseStructContainer c;
+	c = e220ttl.getConfiguration();
+	// It's important get configuration pointer before all other operation
+	Configuration configuration = *(Configuration *)c.data;
+	Serial.println(c.status.getResponseDescription());
+	Serial.println(c.status.code);
+
+	printParameters(configuration);
+	c.close();
 }

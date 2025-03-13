@@ -57,7 +57,7 @@ char message_times[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 unsigned long time_last_message_send;
 int heartbeat_sampleinterval;
 bool lastmessage_done = false;
-bool data_pulled = false;
+bool data_pulled = true; //Init with true so that first sample can be taken and newdata_avail becomes true
 bool newdata_available = false;
 
 // Protoypes

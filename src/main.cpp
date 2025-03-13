@@ -98,7 +98,6 @@ void loop()
 {
 	//If received message, fill temp struct, and verify
 	if(ReceiveLoRa()){
-
 		if(verify_message()){
 			// Acknowledge message received succesfully
 			Serial.println("Verification successful, sending acknowledgement");
@@ -230,6 +229,8 @@ bool ReceiveLoRa(){
 			Serial.print(recieved_message.lrc);
 			Serial.print(" - match with calculated: ");
 			Serial.print(create_LRC(recieved_message) == recieved_message.lrc);
+			Serial.print(" - Temperature sensor val: ");
+			Serial.print(recieved_message.data.temperature_sensor);
 
 			Serial.print(" - Calculated LRC:");
 			Serial.println(create_LRC(recieved_message));
@@ -348,8 +349,12 @@ void retransmitReq(){
 
 void send_message_ack(message_ack message){
 	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message_ack));
-	Serial.println("Sent acknowledgement:");
-	Serial.println(rs.getResponseDescription());
+	Serial.print("Sent acknowledgement:	");
+	Serial.print(ack_message.ack_ID, DEC);
+	Serial.print("	");
+	Serial.print(rs.getResponseDescription());
+	Serial.print("	");
 	Serial.println(rs.code);
+	Serial.println("	");
 
 }

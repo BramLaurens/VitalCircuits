@@ -68,6 +68,7 @@ struct response_message_struct
   	char eot;
 };
 
+// Initialize variables
 sensordata_struct sensordata_buffer[256];
 
 void printParameters(struct Configuration configuration);
@@ -451,7 +452,7 @@ int count_bits(int num)
 			// if LSB is 1, tot++
 			tot++;
 		}
-		
+
 		// Shift all bits 1 to the right
 		num >>= 1;
 	}

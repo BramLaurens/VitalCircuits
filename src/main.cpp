@@ -22,7 +22,7 @@
  
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
-
+#define messageTimeout 1000
 #include "Arduino.h"
 #include "LoRa_E220.h"
 
@@ -226,7 +226,7 @@ void loop()
 	}
 
 	// If there is no message available, check if the last message was send more than 85 ms ago
-	else if (millis() - time_last_message_send > 85)
+	else if (millis() - time_last_message_send > messageTimeout)
 	{
 		// Last message is more than 85 ms ago - resend the message
 

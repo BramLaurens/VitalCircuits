@@ -1,5 +1,6 @@
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
+#define messageTimeout 200
 
 #include "Arduino.h"
 #include "LoRa_E220.h"
@@ -63,6 +64,10 @@ int create_LRC(message_struct message);
 int create_LRC_ACK(message_ack message);
 int count_bits(int num);
 
+// Variables
+unsigned long lastSendTime = 0;
+char timeoutMode = 0;
+
 void setup()
 {
 	//Set serial for debugging
@@ -85,7 +90,7 @@ void setup()
 	e220ttl.setMode(MODE_0_NORMAL);
 
 	//Set LoRa module config
-	//SetLoRaConfig();
+	//SetLoRaConfig();  v                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 	GetLoRaConfig();
 
 	// set new serial speed for TXRX
@@ -102,14 +107,41 @@ void loop()
 			// Acknowledge message received succesfully
 			Serial.println("Verification successful, sending acknowledgement");
 			acknowledgeLoRa();
+			lastSendTime = millis();
+			//timeoutMode = true > timeout for acknowledgement
+			timeoutMode = 1;
 			verifiedMessage = recieved_message;
 		}
 		else{
 			// Request retransmit
 			Serial.println("Verification failed, requesting retransmit");
 			retransmitReq();
+			lastSendTime = millis();
+			//timeoutMode = false > timeout for retransmit request
+			timeoutMode = 2;
 		}
 	}
+	
+	// Send either ack or retransmit req if not hearing anything
+	if ((millis() - lastSendTime )> messageTimeout)
+	{
+		switch (timeoutMode)
+		{
+		case 1:
+			Serial.println("Timeout, resending acknowledgement");
+			acknowledgeLoRa();
+			lastSendTime = millis();
+			break;
+		
+		case 2:
+			Serial.println("Timeout, resending retransmit request");
+			acknowledgeLoRa();
+			lastSendTime = millis();
+		default:
+			break;
+		}
+	}
+
 }
 
 void SetLoRaConfig()
@@ -217,8 +249,8 @@ bool ReceiveLoRa(){
 			// Print the data received
 			Serial.print(" - Time: ");
 			Serial.print(millis());
-			Serial.print(" - RSSI:	");
-			//Serial.print(rsc.rssi);
+			Serial.print(" - RSSI: ");
+			Serial.print(rsc.rssi);
 			Serial.print(" - received p_ID: ");
 			Serial.print(recieved_message.p_ID, DEC);
 			Serial.print(" - recieved src_ID: ");

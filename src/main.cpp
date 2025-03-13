@@ -4,6 +4,8 @@
 
 RH_ASK driver(3000);
 
+TaskHandle_t data_versturen;
+
 struct sensordata_struct {
     unsigned char pressure_sensor[55];    // 0 - 255
     int temperature_sensor;               // -32,768 - 32,767
@@ -31,10 +33,10 @@ int counter = 1;              // Packet counter
 
 void setup() {
     Serial.begin(9600);
-    pinMode(15, INPUT);  // Pressure sensor
-    pinMode(16, INPUT);  // Heartbeat sensor
-    pinMode(17, INPUT);  // Moisture sensor
-    pinMode(18, INPUT);  // Temperature sensor
+    pinMode(35, INPUT);  // Pressure sensor
+    pinMode(34, INPUT);  // Heartbeat sensor
+    pinMode(33, INPUT);  // Moisture sensor
+    pinMode(32, INPUT);  // Temperature sensor
 
     // Initialize the message structure
     message.soc = 1;                         // Start of communication
@@ -44,21 +46,36 @@ void setup() {
     message.functiecode = 2;                 // Function code (2 = Data transmit)
     message.eot = 0xFF;                      // End of transmission
     message.lrc = 0;                         // LRC (Longitudinal Redundancy Check)
+
+     xTaskCreatePinnedToCore(
+   data_versturen,
+   "Task1",
+   10000,
+   NULL,
+   1,
+   &Task1,
+   0
+ );
 }
 
 void loop() {
-    // Read sensor values
-    int pressure_value = analogRead(15);
-    int heartbeat_value = analogRead(16);
-    live_data.moisture_sensor = analogRead(17);
-    live_data.temperature_sensor = analogRead(18);
+    
+    
 
+    for (heartbeatIndex<=54){
     // Add sensor values to arrays (circular buffer)
+    int heartbeat_value = analogRead(34);
     live_data.heartbeat_sensor[heartbeatIndex] = heartbeat_value;
     heartbeatIndex = (heartbeatIndex + 1) % 55;  
 
+    int pressure_value = analogRead(35);
     live_data.pressure_sensor[pressureIndex] = pressure_value;
-    pressureIndex = (pressureIndex + 1) % 55;  
+    pressureIndex = (pressureIndex + 1) % 55; 
+    delay(2);
+    } 
+    // Read sensor values
+    live_data.moisture_sensor = analogRead(33);
+    live_data.temperature_sensor = analogRead(32);
 
     // Update message data with the latest sensor readings
     message.data = live_data;
@@ -85,18 +102,24 @@ void loop() {
     Serial.println();
 
     // Send message when buffer is full (heartbeatIndex == 0)
-    if (heartbeatIndex == 0) {
-        // Assuming the driver is properly configured for communication
-        driver.send((uint8_t *)&message, sizeof(message)); 
-        driver.waitPacketSent(); // Wait until the packet is sent
-        counter++;               // Increment packet counter
-        message.pc = counter;    // Update packet counter in the message
-    }
+    
 
     // Optionally clear arrays if you want to reset the data
     if (heartbeatIndex == 0) {
         memset(live_data.heartbeat_sensor, 0, sizeof(live_data.heartbeat_sensor)); 
         memset(live_data.pressure_sensor, 0, sizeof(live_data.pressure_sensor)); 
     }
-   delay(2);
+  
 }
+
+void Task1code(void *pvParameters){
+  if (heartbeatIndex == 0) {
+        // Assuming the driver is properly configured for communication
+        driver.send((uint8_t *)&message, sizeof(message)); 
+        driver.waitPacketSent(); // Wait until the packet is sent
+        counter++;               // Increment packet counter
+        message.pc = counter;    // Update packet counter in the message
+    }
+    }
+
+

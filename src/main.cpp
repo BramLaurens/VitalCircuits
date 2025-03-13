@@ -66,10 +66,7 @@ void loop() {
 
         live_data.moisture_sensor = analogRead(33);
         live_data.temperature_sensor = analogRead(32);
-        while (send) {
-        // Update message
-        message.data = live_data;
-        send = true; 
+      
         
 
         while (!klaar_voor_nieuwe_data) // Wachten 

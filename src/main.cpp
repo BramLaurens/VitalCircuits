@@ -328,7 +328,7 @@ void SetLoRaConfig()
 	configuration.OPTION.RSSIAmbientNoise = RSSI_AMBIENT_NOISE_DISABLED; // Need to send special command
 	configuration.OPTION.transmissionPower = POWER_22;					 // Device power
 
-	configuration.TRANSMISSION_MODE.enableRSSI = RSSI_DISABLED;						 // Enable RSSI info
+	configuration.TRANSMISSION_MODE.enableRSSI = RSSI_ENABLED;						 // Enable RSSI info
 	configuration.TRANSMISSION_MODE.fixedTransmission = FT_TRANSPARENT_TRANSMISSION; // Enable repeater mode
 	configuration.TRANSMISSION_MODE.enableLBT = LBT_DISABLED;						 // Check interference
 	configuration.TRANSMISSION_MODE.WORPeriod = WOR_2000_011;						 // WOR timing

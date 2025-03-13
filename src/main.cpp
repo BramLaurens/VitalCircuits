@@ -52,6 +52,9 @@ struct response_message_struct
 
 // Initialize variables
 sensordata_struct sensordata_buffer[256];
+char timing_ID = 0;
+char message_times[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
+unsigned long time_last_message_send;
 
 // Protoypes
 void printParameters(struct Configuration configuration);
@@ -65,10 +68,13 @@ void lora_TXRX(void *pvParameters);
 int create_LRC(message_struct message);
 int create_LRC_ack(response_message_struct message);
 int count_bits(int num);
-unsigned long time_last_message_send;
+
+int rolling_averagetime();
+
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
 sensordata_struct test_data;
+sensordata_struct live_data;
 
 // Create a message struct to store the message to be sent
 message_struct message;
@@ -83,6 +89,10 @@ void setup()
 	Serial2.begin(9600, SERIAL_8N1, 16, 17);  				// For communication to the LoRa module
 	delay(500);												// Give the Serial some time to initialize
 
+	pinMode(35, INPUT);  // Pressure sensor
+    pinMode(34, INPUT);  // Heartbeat sensor
+    pinMode(33, INPUT);  // Moisture sensor
+    pinMode(32, INPUT);  // Temperature sensor
 
 	// -- THE FOLLOWING CODE IS FOR TESTING PURPOSES ONLY --
 	// fill test_data
@@ -93,17 +103,18 @@ void setup()
 	}
 	test_data.temperature_sensor = 12345;
 	test_data.moisture_sensor = 54321;
+	// -- THE ABOVE CODE IS FOR TESTING PURPOSES ONLY --
 
 
-	// Fill message
+	// Fill protocol
 	message.soc = 0x7E; 									// Self chosen value
 	message.src_ID = 0x04;									// Source ID - 0000 0001 In our case (EV1A Group 4)
 	message.des_ID = 0x04;									// Destination ID - 0000 0111 In our case (EV1A Group 4)
 	message.p_ID = 0x00;									// Package ID - Starts at 0
 	message.eot = 0xA4; 									// Self chosen value
 	message.pl = sizeof(message) - sizeof(message.lrc);		// Payload length - 1 byte
-	message.lrc = create_LRC(message);					// LRC - Integrity check
-	// -- THE ABOVE CODE IS FOR TESTING PURPOSES ONLY --
+	
+	
 
 
 	// Begin communication to the LoRa module
@@ -149,7 +160,7 @@ void lora_TXRX(void *pvParameters) {
 		if (ReceiveLoRa()) 
 		{
 			// A message was recieved
-			Serial.println("RECIEVED MESSAGE");
+			Serial.println(" ");
 			
 			// Check if the message is an acknowledge or a retransmit
 			// This if statement also checks the LRC, if the LRC isn't correct, the message is ignored.
@@ -161,13 +172,16 @@ void lora_TXRX(void *pvParameters) {
 				message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
 
 				// Debug message
+				Serial.println(" ");
+				Serial.println("RECIEVED ACKNOWLEDGE");
 				Serial.print("Recieved ackowledge for package: ");
-				Serial.print(recieved_message.p_ID, DEC);
+				Serial.print(recieved_message.ack_ID, DEC);
 				Serial.print(" - ack_ID: ");
 				Serial.print(recieved_message.ack_ID, DEC);
 				Serial.print(" - t: (");
 				Serial.print(millis());
 				Serial.println(")");
+				Serial.println(" ");
 				// END Debug message
 
 
@@ -249,7 +263,8 @@ void send_message(message_struct message)
 	message.lrc = create_LRC(message);
 	
 	// Debug message
-	Serial.print("Sent message (t: ");
+	Serial.println("SENT MESSAGE");
+	Serial.print("(t: ");
 	int timer = millis();
 	Serial.print(timer);
 	Serial.print(") - Status: ");
@@ -269,12 +284,31 @@ void send_message(message_struct message)
 	Serial.print(millis() - timer);
 	Serial.print(") ");
 	Serial.print(" - p_ID: ");
-	Serial.println(message.p_ID, DEC);
+	Serial.print(message.p_ID, DEC);
 	// END Debug message
 
 
-	// Save the time the message was sent
+	//Update the message times ID in the array
+	message_times[timing_ID] = millis() - time_last_message_send;
+
+	// Save the time the message was sent and increase the timing_ID
 	time_last_message_send = millis();
+	timing_ID++;
+
+	//	Go back to the first position if the timing array is full
+	if(timing_ID > 9){
+		timing_ID = 0;
+	}
+
+	Serial.print(" - Timing: ");
+	// Print the timing array
+	for(int i = 0; i < 10; i++){
+		Serial.print(message_times[i], DEC);
+		Serial.print(" ");
+	}
+	Serial.print(" - Average: ");
+	Serial.println(rolling_averagetime());
+	Serial.println(" ");
 }
 
 // Recieve a message from the lora module.
@@ -480,4 +514,13 @@ void getLoRaConfig()
 
 	printParameters(configuration);
 	c.close();
+}
+
+int rolling_averagetime()
+{
+	int sum = 0;
+	for(int i = 0; i < 10; i++){
+		sum += message_times[i];
+	}
+	return sum/10;
 }

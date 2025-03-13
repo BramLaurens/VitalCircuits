@@ -55,6 +55,10 @@ sensordata_struct sensordata_buffer[256];
 char timing_ID = 0;
 char message_times[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 unsigned long time_last_message_send;
+int heartbeat_sampleinterval;
+bool lastmessage_done = false;
+bool data_pulled = false;
+bool newdata_available = false;
 
 // Protoypes
 void printParameters(struct Configuration configuration);
@@ -156,6 +160,25 @@ void setup()
 void lora_TXRX(void *pvParameters) {
     for (;;) { // Infinite loop
 
+		// If there is new data available and the last message is sent and acknowledged, send the new data
+		if(newdata_available && lastmessage_done){
+
+			// Reset variables, stop task 1 from putting new data in the live buffer
+			lastmessage_done = false;
+			message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
+
+			// Update data
+			message.data = live_data;
+			data_pulled = true;
+
+			// Set functiecode naar 0x02 (send data)
+			message.functiecode = 0x02;
+
+			// Send message
+			send_message(message);
+		
+		}
+
 		// Wait for response
 		if (ReceiveLoRa()) 
 		{
@@ -163,14 +186,10 @@ void lora_TXRX(void *pvParameters) {
 			Serial.println(" ");
 			
 			// Check if the message is an acknowledge or a retransmit
-			// This if statement also checks the LRC, if the LRC isn't correct, the message is ignored.
+			// This if statement also checks the ack LRC, if the ack LRC isn't correct, the message is ignored.
 			if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
 			{
 				// recieved ackowledge - sending next package
-
-				// update package ID
-				message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
-
 				// Debug message
 				Serial.println(" ");
 				Serial.println("RECIEVED ACKNOWLEDGE");
@@ -184,21 +203,15 @@ void lora_TXRX(void *pvParameters) {
 				Serial.println(" ");
 				// END Debug message
 
-
-				// Update data
-				message.data = test_data; 		// TODO: Needs to be changed to the real sensor data
-
-				// Set functiecode naar 0x02 (send data)
-				message.functiecode = 0x02;
-
-				// Send message
-				send_message(message);
+				//Mark verification routine as done
+				lastmessage_done = true;
 				
+
 			}
+
+			// if recieved retransmit - sending the requested package
 			else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
 			{
-				// recieved retransmit - sending the requested package
-				
 				// Debug message
 				Serial.print("Recieved retramsnit request for package: ");
 				Serial.print(recieved_message.ack_ID, DEC);
@@ -250,7 +263,31 @@ void lora_TXRX(void *pvParameters) {
 
 void loop()
 {
+	// Collect and process sensor data
+	// Calculate optimal sample interval for heartbeat sensor based on the rolling average latency of the last 10 messages
+	heartbeat_sampleinterval = rolling_averagetime() / 59;
+
+	// Wait for data to be pulled in task 0
+	if(data_pulled){
+		newdata_available = false;
+
+		// Collect sensor data when last message is sent and acknowledged
+		for(int i = 0; i < 59; i++){
+			live_data.heartbeat[i] = analogRead(34);
+			live_data.pressure_sensor[i] = analogRead(35);
+			delay(heartbeat_sampleinterval);
+		}
+
+		live_data.moisture_sensor = analogRead(33);
+		live_data.temperature_sensor = analogRead(32);
+
+		// Flag new data as available and not pulled yet
+		newdata_available = true;
+		data_pulled = false;
+	}
 	
+
+
 }
 
 // Send a message through the lora module.

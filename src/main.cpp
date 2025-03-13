@@ -29,7 +29,6 @@
 LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
 
 
-
 // Define the struct for the message
 struct sensordata_struct
 {
@@ -85,7 +84,7 @@ sensordata_struct test_data;
 message_struct message;
 
 // Create a message struct to store the received message
-message_ack_struct recieved_message {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+message_ack_struct recieved_message;
 
 void setup()
 {
@@ -190,6 +189,7 @@ void loop()
 			message.data = sensordata_buffer[recieved_message.ack_ID];
 			message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
 			message.p_ID = recieved_message.ack_ID;
+			message.lrc = create_LRC(message);
 			send_message(message);
 
 			// KNOWN ISSUE - message.p_ID is fucked when retransmitting

@@ -1,23 +1,3 @@
-/*
- * LoRa E220
- * Set configuration.
- *
- * You must uncommend the correct constructor.
- *
- * by Renzo Mischianti <https://www.mischianti.org>
- *
- * https://www.mischianti.org
- *
- * E220		  ----- WeMos D1 mini	----- esp32			----- Arduino Nano 33 IoT	----- Arduino MKR	----- Raspberry Pi Pico   ----- stm32               ----- ArduinoUNO
- * M0         ----- D7 (or 3.3v)	----- 19 (or 3.3v)	----- 4 (or 3.3v)			----- 2 (or 3.3v)	----- 10 (or 3.3v)	      ----- PB0 (or 3.3v)       ----- 7 Volt div (or 3.3v)
- * M1         ----- D6 (or 3.3v)	----- 21 (or 3.3v)	----- 6 (or 3.3v)			----- 4 (or 3.3v)	----- 11 (or 3.3v)	      ----- PB10 (or 3.3v)      ----- 6 Volt div (or 3.3v)
- * TX         ----- D3 (PullUP)		----- TX2 (PullUP)	----- TX1 (PullUP)			----- 14 (PullUP)	----- 8 (PullUP)	      ----- PA2 TX2 (PullUP)    ----- 4 (PullUP)
- * RX         ----- D4 (PullUP)		----- RX2 (PullUP)	----- RX1 (PullUP)			----- 13 (PullUP)	----- 9 (PullUP)	      ----- PA3 RX2 (PullUP)    ----- 5 Volt div (PullUP)
- * AUX        ----- D5 (PullUP)		----- 18  (PullUP)	----- 2  (PullUP)			----- 0  (PullUP)	----- 2  (PullUP)	      ----- PA0  (PullUP)       ----- 3 (PullUP)
- * VCC        ----- 3.3v/5v			----- 3.3v/5v		----- 3.3v/5v				----- 3.3v/5v		----- 3.3v/5v		      ----- 3.3v/5v             ----- 3.3v/5v
- * GND        ----- GND				----- GND			----- GND					----- GND			----- GND			      ----- GND                 ----- GND
- *
- */
 
  
 #define LoRa_E220_DEBUG
@@ -25,6 +5,8 @@
 #define messageTimeout 1000
 #include "Arduino.h"
 #include "LoRa_E220.h"
+
+TaskHandle_t TXRX_task;
 
 
 // ---------- esp32 pins --------------
@@ -71,12 +53,14 @@ struct response_message_struct
 // Initialize variables
 sensordata_struct sensordata_buffer[256];
 
+// Protoypes
 void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void SetLoRaConfig(); // Unused
 void send_message(message_struct message);
 bool ReceiveLoRa();
 void getLoRaConfig();
+void lora_TXRX(void *pvParameters);
 
 int create_LRC(message_struct message);
 int create_LRC_ack(response_message_struct message);
@@ -141,6 +125,16 @@ void setup()
 	// Set configuration
 	// SetLoRaConfig();
 
+	//Create a task to send data and pin it to core 1
+	xTaskCreatePinnedToCore(
+        lora_TXRX, 
+        "TXRX_task",
+        10000,
+        NULL,
+        1,
+        &TXRX_task,
+        0
+    );  
 
 	// set new serial speed (e220 needs 9600 to config and sends data on 115200)
 	Serial2.flush();
@@ -148,95 +142,101 @@ void setup()
 	Serial2.begin(115200);
 }
 
+void lora_TXRX(void *pvParameters) {
+    for (;;) { // Infinite loop
+
+		// Wait for response
+		if (ReceiveLoRa()) 
+		{
+			// A message was recieved
+			Serial.println("RECIEVED MESSAGE");
+			
+			// Check if the message is an acknowledge or a retransmit
+			// This if statement also checks the LRC, if the LRC isn't correct, the message is ignored.
+			if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
+			{
+				// recieved ackowledge - sending next package
+
+				// update package ID
+				message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
+
+				// Debug message
+				Serial.print("Recieved ackowledge for package: ");
+				Serial.print(recieved_message.p_ID, DEC);
+				Serial.print(" - ack_ID: ");
+				Serial.print(recieved_message.ack_ID, DEC);
+				Serial.print(" - t: (");
+				Serial.print(millis());
+				Serial.println(")");
+				// END Debug message
+
+
+				// Update data
+				message.data = test_data; 		// TODO: Needs to be changed to the real sensor data
+
+				// Set functiecode naar 0x02 (send data)
+				message.functiecode = 0x02;
+
+				// Send message
+				send_message(message);
+				
+			}
+			else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
+			{
+				// recieved retransmit - sending the requested package
+				
+				// Debug message
+				Serial.print("Recieved retramsnit request for package: ");
+				Serial.print(recieved_message.ack_ID, DEC);
+				Serial.print(" - t: (");
+				Serial.print(millis());
+				Serial.println(")");
+				// END Debug message
+
+				
+				// Set message data the data of the requested package
+				message.data = sensordata_buffer[recieved_message.ack_ID];
+				
+				// Set functiecode naar 0x06 (retransmit)
+				// NOTE - this functiecode is not in the original protocol
+				message.functiecode = 0x06;		
+				
+				// Set the package ID to the requested package
+				message.p_ID = recieved_message.ack_ID;
+				
+				// Generate LRC
+				message.lrc = create_LRC(message);
+
+				// Send message
+				send_message(message);
+			}
+
+			else 
+			{
+				// Functiecode is not recognized or LRC is not correct
+				// In this case we wait until we recieve a new message (acknowledge or retransmit)
+				Serial.println("ERROR -  functiecode not recognized or LRC not correct.");
+			}
+		}
+
+		// If there is no message available, check if the last message was send more than 85 ms ago
+		else if (millis() - time_last_message_send > messageTimeout)
+		{
+			// Last message is more than 85 ms ago - resend the message
+
+			Serial.print("WARNING - Got no acknowledge for message: ");
+			Serial.print(message.p_ID, DEC);
+			Serial.println(" - Resending message.");
+
+			// Resend message
+			send_message(message);
+		}
+    }
+}
 
 void loop()
 {
-	// Wait for response
-	if (ReceiveLoRa()) 
-	{
-		// A message was recieved
-		Serial.println("RECIEVED MESSAGE");
-		
-		// Check if the message is an acknowledge or a retransmit
-		// This if statement also checks the LRC, if the LRC isn't correct, the message is ignored.
-		if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
-		{
-			// recieved ackowledge - sending next package
-
-			// update package ID
-			message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
-
-			// Debug message
-			Serial.print("Recieved ackowledge for package: ");
-			Serial.print(recieved_message.p_ID, DEC);
-			Serial.print(" - ack_ID: ");
-			Serial.print(recieved_message.ack_ID, DEC);
-			Serial.print(" - t: (");
-			Serial.print(millis());
-			Serial.println(")");
-			// END Debug message
-
-
-			// Update data
-			message.data = test_data; 		// TODO: Needs to be changed to the real sensor data
-
-			// Set functiecode naar 0x02 (send data)
-			message.functiecode = 0x02;
-
-			// Send message
-			send_message(message);
-			
-		}
-		else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
-		{
-			// recieved retransmit - sending the requested package
-			
-			// Debug message
-			Serial.print("Recieved retramsnit request for package: ");
-			Serial.print(recieved_message.ack_ID, DEC);
-			Serial.print(" - t: (");
-			Serial.print(millis());
-			Serial.println(")");
-			// END Debug message
-
-			
-			// Set message data the data of the requested package
-			message.data = sensordata_buffer[recieved_message.ack_ID];
-			
-			// Set functiecode naar 0x06 (retransmit)
-			// NOTE - this functiecode is not in the original protocol
-			message.functiecode = 0x06;		
-			
-			// Set the package ID to the requested package
-			message.p_ID = recieved_message.ack_ID;
-			
-			// Generate LRC
-			message.lrc = create_LRC(message);
-
-			// Send message
-			send_message(message);
-		}
-
-		else 
-		{
-			// Functiecode is not recognized or LRC is not correct
-			// In this case we wait until we recieve a new message (acknowledge or retransmit)
-			Serial.println("ERROR -  functiecode not recognized or LRC not correct.");
-		}
-	}
-
-	// If there is no message available, check if the last message was send more than 85 ms ago
-	else if (millis() - time_last_message_send > messageTimeout)
-	{
-		// Last message is more than 85 ms ago - resend the message
-
-		Serial.print("WARNING - Got no acknowledge for message: ");
-		Serial.print(message.p_ID, DEC);
-		Serial.println(" - Resending message.");
-
-		// Resend message
-		send_message(message);
-	}
+	
 }
 
 // Send a message through the lora module.

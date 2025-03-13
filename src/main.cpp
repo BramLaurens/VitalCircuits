@@ -43,13 +43,7 @@ void setup() {
     message.functiecode = 2;
     message.eot = 0xFF;
     message.lrc = 0;
-
-    // Initialize RF driver
-    if (!driver.init()) {
-        Serial.println("RF driver initialization failed!");
-        while (1);
-    }
-
+    
     xTaskCreatePinnedToCore(
         Task1code, 
         "data_versturen",

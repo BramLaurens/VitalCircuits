@@ -1,8 +1,4 @@
 #include <Arduino.h>
-#include <RH_ASK.h>
-#include <SPI.h> // Not actually used but needed to compile
-
-RH_ASK driver(3000);
 
 TaskHandle_t data_versturen;
 
@@ -21,15 +17,16 @@ struct message_struct {
     char pc;               // Packet counter
     char functiecode;      // Function code
     sensordata_struct data;  // Sensor data
-    char eot;              // End of transmission
     char lrc;              // Longitudinal redundancy check
+    char eot;              // End of transmission
 };
 
-message_struct message;
+message_struct message = {0, 0, 0, 0}; // Not sure if this is permitted
 sensordata_struct live_data; 
-int heartbeatIndex = 0;       // Index for heartbeat array
-int pressureIndex = 0;        // Index for pressure array
-int counter = 1;              // Packet counter
+int counter = 1;  // Packet counter
+bool send = false;
+
+
 
 void setup() {
     Serial.begin(9600);
@@ -38,88 +35,84 @@ void setup() {
     pinMode(33, INPUT);  // Moisture sensor
     pinMode(32, INPUT);  // Temperature sensor
 
-    // Initialize the message structure
-    message.soc = 1;                         // Start of communication
-    message.src_ID = 0x04;                   // Source ID for EV1A Group 4
-    message.des_ID = 0x04;                   // Destination ID for EV1A Group 4
-    message.pc = counter;                    // Packet counter
-    message.functiecode = 2;                 // Function code (2 = Data transmit)
-    message.eot = 0xFF;                      // End of transmission
-    message.lrc = 0;                         // LRC (Longitudinal Redundancy Check)
+    // Initialize message structure
+    message.soc = 1;
+    message.src_ID = 0x04;
+    message.des_ID = 0x04;
+    message.pc = counter;
+    message.functiecode = 2;
+    message.eot = 0xFF;
+    message.lrc = 0;
 
-     xTaskCreatePinnedToCore(
-   data_versturen,
-   "Task1",
-   10000,
-   NULL,
-   1,
-   &Task1,
-   0
- );
+    // Initialize RF driver
+    if (!driver.init()) {
+        Serial.println("RF driver initialization failed!");
+        while (1);
+    }
+
+    xTaskCreatePinnedToCore(
+        Task1code, 
+        "data_versturen",
+        10000,
+        NULL,
+        1,
+        &data_versturen,
+        0
+    );  
 }
 
 void loop() {
-    
-    
 
-    for (heartbeatIndex<=54){
-    // Add sensor values to arrays (circular buffer)
-    int heartbeat_value = analogRead(34);
-    live_data.heartbeat_sensor[heartbeatIndex] = heartbeat_value;
-    heartbeatIndex = (heartbeatIndex + 1) % 55;  
+     // Collect data only if not sending
+        for (int a = 0; a < 55; a++) {
+            live_data.heartbeat_sensor[a] = analogRead(34);
+            live_data.pressure_sensor[a] = analogRead(35);
+            delay(2);
+        }
 
-    int pressure_value = analogRead(35);
-    live_data.pressure_sensor[pressureIndex] = pressure_value;
-    pressureIndex = (pressureIndex + 1) % 55; 
-    delay(2);
-    } 
-    // Read sensor values
-    live_data.moisture_sensor = analogRead(33);
-    live_data.temperature_sensor = analogRead(32);
+        live_data.moisture_sensor = analogRead(33);
+        live_data.temperature_sensor = analogRead(32);
+        while (send) {
+        // Update message
+        message.data = live_data;
+        send = true; 
+        
 
-    // Update message data with the latest sensor readings
-    message.data = live_data;
+        while (!klaar_voor_nieuwe_data) // Wachten 
 
-    // Print data to the serial monitor
-    Serial.print("Druksensor waarden: ");
-    for (int b = 0; b < 55; b++) {
-        Serial.print(live_data.pressure_sensor[b]);
-        Serial.print(" ");
-    }
-    Serial.println();
-    
-    Serial.print("Temperatuur: ");
-    Serial.println(live_data.temperature_sensor);
+        message.data = live_data
+        klaar_om_te_sturen = true;
 
-    Serial.print("Vochtigheidssensor: ");
-    Serial.println(live_data.moisture_sensor);
 
-    Serial.print("Heartbeat waarden: ");
-    for (int i = 0; i < 55; i++) {
-        Serial.print(live_data.heartbeat_sensor[i]);
-        Serial.print(" ");
-    }
-    Serial.println();
+        // Debug output
+        /*
+        Serial.print("Druksensor waarden: ");
+        for (int b = 0; b < 55; b++) {
+            Serial.print(live_data.pressure_sensor[b]);
+            Serial.print(" ");
+        }
+        Serial.println();
+        
+        Serial.print("Temperatuur: ");
+        Serial.println(live_data.temperature_sensor);
 
-    // Send message when buffer is full (heartbeatIndex == 0)
-    
+        Serial.print("Vochtigheidssensor: ");
+        Serial.println(live_data.moisture_sensor);
 
-    // Optionally clear arrays if you want to reset the data
-    if (heartbeatIndex == 0) {
-        memset(live_data.heartbeat_sensor, 0, sizeof(live_data.heartbeat_sensor)); 
-        memset(live_data.pressure_sensor, 0, sizeof(live_data.pressure_sensor)); 
-    }
-  
+        Serial.print("Heartbeat waarden: ");
+        for (int i = 0; i < 55; i++) {
+            Serial.print(live_data.heartbeat_sensor[i]);
+            Serial.print(" ");
+        }
+        Serial.println();
+
+        */
+        }    
 }
 
-void Task1code(void *pvParameters){
-  if (heartbeatIndex == 0) {
-        // Assuming the driver is properly configured for communication
-        driver.send((uint8_t *)&message, sizeof(message)); 
-        driver.waitPacketSent(); // Wait until the packet is sent
-        counter++;               // Increment packet counter
-        message.pc = counter;    // Update packet counter in the message
+void data_versturen(void *pvParameters) {
+    for (;;) { // Infinite loop
+        // Lora verzend code.
+        while (1);
     }
-    }
-
-
+}

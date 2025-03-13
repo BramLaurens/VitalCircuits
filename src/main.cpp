@@ -76,6 +76,7 @@ bool ReceiveLoRa();
 int create_LRC(message_struct message);
 int create_LRC_ack(message_ack_struct message);
 int count_bits(int num);
+unsigned long time_last_message_send;
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
 sensordata_struct test_data;
@@ -176,12 +177,25 @@ void loop()
 		if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
 		{
 			// recieved ackowledge - sending next package
+
+
+			// update package ID
+			message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
+
+			// Debug message
+			Serial.print("Recieved ackowledge for package: ");
+			Serial.print(recieved_message.p_ID, DEC);
+			Serial.print(" - ack_ID: ");
+			Serial.print(recieved_message.ack_ID, DEC);
+			Serial.print(" - t: (");
+			Serial.print(millis());
+			Serial.println(")");
+			// END Debug message
+
 			message.data = test_data; 		// Needs to be changed to the real sensor data
 			message.functiecode = 0x02;		// Send data
 			send_message(message);
-
-			// Increase the package ID (For testing purposes)
-			message.p_ID++;
+			
 		}
 		else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
 		{
@@ -189,16 +203,26 @@ void loop()
 			message.data = sensordata_buffer[recieved_message.ack_ID];
 			message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
 			message.p_ID = recieved_message.ack_ID;
+			
 			message.lrc = create_LRC(message);
 			send_message(message);
 
 			// KNOWN ISSUE - message.p_ID is fucked when retransmitting
 		}
 
-		else {
+		else 
+		{
 			// Error
-			Serial.println("WHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+			Serial.println("ERROR -  functiecode not recognized or LRC not correct.");
 		}
+	}
+	else if (millis() - time_last_message_send > 85) // If there is no acknowledge within 85 ms, resend the message.
+	{
+		// Resend message
+		Serial.print("WARNING - Got no acknowledge for message: ");
+		Serial.print(message.p_ID, DEC);
+		Serial.println(" - Resending message.");
+		send_message(message);
 	}
 }
 
@@ -244,8 +268,16 @@ void send_message(message_struct message)
 	Serial.print(millis());
 	Serial.print(") - Diff: (");
 	Serial.print(millis() - timer);
-	Serial.println(")");
+	Serial.print(") ");
+
+	Serial.print(" - p_ID: ");
+	Serial.println(message.p_ID, DEC);
+
 	// END Debug message
+
+
+	// Save the time the message was sent
+	time_last_message_send = millis();
 	
 }
 
@@ -261,7 +293,7 @@ bool ReceiveLoRa(){
 		// Is something goes wrong print error
 		if (rsc.status.code != 1)
 		{
-			Serial.print("Error with RSC:");
+			Serial.print("Error with RSC: ");
 			Serial.println(rsc.status.getResponseDescription());
 		}
 		else
@@ -440,5 +472,6 @@ int count_bits(int num)
 		// Shift all bits 1 to the right
 		num >>= 1;
 	}
+
 	return tot;
 }

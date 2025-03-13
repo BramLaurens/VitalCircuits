@@ -18,6 +18,8 @@
  * GND        ----- GND				----- GND			----- GND					----- GND			----- GND			      ----- GND                 ----- GND
  *
  */
+
+ 
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
 
@@ -29,7 +31,7 @@
 LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
 
 
-// Define the struct for the message
+// Define the struct for the sensordata
 struct sensordata_struct
 {
     unsigned char pressure_sensor[59];        // 0 - 255
@@ -38,6 +40,7 @@ struct sensordata_struct
     short int heartbeat[59];                // -32,768 - 32,767
 };
 
+// Define the struct for the output message
 struct message_struct
 {
 	char soc;
@@ -51,8 +54,8 @@ struct message_struct
 char eot;
 };
 
-
-struct message_ack_struct
+// Define the struct for the output message
+struct response_message_struct
 {
 	char soc;
   	char pl;
@@ -69,12 +72,12 @@ sensordata_struct sensordata_buffer[256];
 
 void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
-void SetLoRaConfig();
+void SetLoRaConfig(); // Unused
 void send_message(message_struct message);
 bool ReceiveLoRa();
 
 int create_LRC(message_struct message);
-int create_LRC_ack(message_ack_struct message);
+int create_LRC_ack(response_message_struct message);
 int count_bits(int num);
 unsigned long time_last_message_send;
 
@@ -85,19 +88,17 @@ sensordata_struct test_data;
 message_struct message;
 
 // Create a message struct to store the received message
-message_ack_struct recieved_message;
+response_message_struct recieved_message;
 
 void setup()
 {
-	Serial.begin(115200);
-	Serial2.begin(9600, SERIAL_8N1, 16, 17);
-	while (!Serial)
-	{
-	};
-	delay(500);
+	// Begin serial ports
+	Serial.begin(115200); 									// For debugging (Serial monitor)
+	Serial2.begin(9600, SERIAL_8N1, 16, 17);  				// For communication to the LoRa module
+	delay(500);												// Give the Serial some time to initialize
 
-	Serial.println();
 
+	// -- THE FOLLOWING CODE IS FOR TESTING PURPOSES ONLY --
 	// fill test_data
 	for (int i = 0; i < 59; i++)
 	{
@@ -116,40 +117,31 @@ void setup()
 	message.eot = 0xA4; 									// Self chosen value
 	message.pl = sizeof(message) - sizeof(message.lrc);		// Payload length - 1 byte
 	message.lrc = create_LRC(message);					// LRC - Integrity check
-	
-	
-	// Debug message
-	Serial.print("Size of message: ");
-	Serial.println(sizeof(message));
-	// END Debug message
+	// -- THE ABOVE CODE IS FOR TESTING PURPOSES ONLY --
 
 
+	// Begin communication to the LoRa module
 	// Startup all pins and UART
 	e220ttl.begin();
 
 	// Set e220 to normal mode
 	e220ttl.setMode(MODE_0_NORMAL);
-	
-	// Set LoRa module config
-	// SetLoRaConfig();
-
 
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
 	Configuration configuration = *(Configuration *)c.data;
 
-	// Print configuration satus
+	// Print configuration satus and parameters.
 	Serial.print("Configuration status: ");
 	Serial.print(c.status.getResponseDescription());
 	Serial.print(" - Code: ");
 	Serial.println(c.status.code);
-
-
 	printParameters(configuration);
 	c.close();
 
-	// set new serial speed
+
+	// set new serial speed (e220 needs 9600 to config and sends data on 115200)
 	Serial2.flush();
 	Serial2.end();
 	Serial2.begin(115200);
@@ -158,26 +150,17 @@ void setup()
 
 void loop()
 {
-	// if (Serial.available()) {
-	// 	// Send initial message
-	// 	message.data = test_data;
-	// 	message.functiecode = 0x02;		// Send data
-	// 	Serial.println(message.p_ID, DEC);
-	// 	send_message(message);
-	// } else {
-		
-	// }
-	
 	// Wait for response
 	if (ReceiveLoRa()) 
 	{
 		// A message was recieved
 		Serial.println("RECIEVED MESSAGE");
 		
+		// Check if the message is an acknowledge or a retransmit
+		// This if statement also checks the LRC, if the LRC isn't correct, the message is ignored.
 		if (recieved_message.functiecode == 0x05 && recieved_message.lrc == create_LRC_ack(recieved_message))
 		{
 			// recieved ackowledge - sending next package
-
 
 			// update package ID
 			message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
@@ -192,62 +175,68 @@ void loop()
 			Serial.println(")");
 			// END Debug message
 
-			message.data = test_data; 		// Needs to be changed to the real sensor data
-			message.functiecode = 0x02;		// Send data
+
+			// Update data
+			message.data = test_data; 		// TODO: Needs to be changed to the real sensor data
+
+			// Set functiecode naar 0x02 (send data)
+			message.functiecode = 0x02;
+
+			// Send message
 			send_message(message);
 			
 		}
 		else if (recieved_message.functiecode == 0x01 && recieved_message.lrc == create_LRC_ack(recieved_message))
 		{
 			// recieved retransmit - sending the requested package
+			
+			// Set message data the data of the requested package
 			message.data = sensordata_buffer[recieved_message.ack_ID];
-			message.functiecode = 0x06;		// Retransmit data (this functiecode is not described in the original protocol)
+			
+			// Set functiecode naar 0x06 (retransmit)
+			// NOTE - this functiecode is not in the original protocol
+			message.functiecode = 0x06;		
+			
+			// Set the package ID to the requested package
 			message.p_ID = recieved_message.ack_ID;
 			
+			// Generate LRC
 			message.lrc = create_LRC(message);
-			send_message(message);
 
-			// KNOWN ISSUE - message.p_ID is fucked when retransmitting
+			// Send message
+			send_message(message);
 		}
 
 		else 
 		{
-			// Error
+			// Functiecode is not recognized or LRC is not correct
+			// In this case we wait until we recieve a new message (acknowledge or retransmit)
 			Serial.println("ERROR -  functiecode not recognized or LRC not correct.");
 		}
 	}
-	else if (millis() - time_last_message_send > 85) // If there is no acknowledge within 85 ms, resend the message.
+
+	// If there is no message available, check if the last message was send more than 85 ms ago
+	else if (millis() - time_last_message_send > 85)
 	{
-		// Resend message
+		// Last message is more than 85 ms ago - resend the message
+
 		Serial.print("WARNING - Got no acknowledge for message: ");
 		Serial.print(message.p_ID, DEC);
 		Serial.println(" - Resending message.");
+
+		// Resend message
 		send_message(message);
 	}
 }
 
-
+// Send a message through the lora module.
 void send_message(message_struct message) 
 {
-	// Save sensor data
+	// Save sensor data in buffer
 	sensordata_buffer[message.p_ID] = message.data;
-
 	
 	// Create LRC
 	message.lrc = create_LRC(message);
-
-
-	// Debug message
-	/*
-	Serial.print("LRC: ");
-	Serial.print(message.lrc, DEC);
-	Serial.print(" - p_ID: ");
-	Serial.print(message.p_ID, DEC);
-	Serial.print(" - Bin: ");
-	Serial.println(message.p_ID, BIN);
-	*/
-	// END Debug message
-
 	
 	// Debug message
 	Serial.print("Sent message (t: ");
@@ -261,7 +250,7 @@ void send_message(message_struct message)
 	// NOTE - This function blocks the program until there is a response
 	ResponseStatus rs = e220ttl.sendMessage((uint8_t *)&message, sizeof(message));
 
-	
+
 	// Debug message
 	Serial.print(rs.getResponseDescription());
 	Serial.print(" (t: ");
@@ -269,26 +258,26 @@ void send_message(message_struct message)
 	Serial.print(") - Diff: (");
 	Serial.print(millis() - timer);
 	Serial.print(") ");
-
 	Serial.print(" - p_ID: ");
 	Serial.println(message.p_ID, DEC);
-
 	// END Debug message
 
 
 	// Save the time the message was sent
 	time_last_message_send = millis();
-	
 }
 
-
+// Recieve a message from the lora module.
 bool ReceiveLoRa(){
-	// If something available
+	// If there is a message avaiable
 	if (e220ttl.available())
 	{
-		// read the String message
-		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(message_ack_struct));
-		recieved_message = *(message_ack_struct *)rsc.data;
+		// create a ResponseStructContainer and fill it with the received message
+		ResponseStructContainer rsc = e220ttl.receiveMessage(sizeof(response_message_struct));
+
+		// TODO: Chek if 
+		// The received message is extracted from the entire message and stored
+		recieved_message = *(response_message_struct *)rsc.data;
 
 		// Is something goes wrong print error
 		if (rsc.status.code != 1)
@@ -296,49 +285,35 @@ bool ReceiveLoRa(){
 			Serial.print("Error with RSC: ");
 			Serial.println(rsc.status.getResponseDescription());
 		}
-		else
-		{
-			/*
-			// Print the data received
-			Serial.print(" - Time: ");
-			Serial.print(millis());
-			Serial.print(" - received p_ID: ");
-			Serial.print(recieved_message.p_ID, DEC);
-			Serial.print(" - recieved src_ID: ");
-			Serial.print(recieved_message.src_ID, DEC);
-			Serial.print(" - received des_ID: ");
-			Serial.print(recieved_message.des_ID, DEC);
-			Serial.print(" - recieved lrc: ");
-			Serial.print(recieved_message.lrc);
-			Serial.print(" - match with calculated: ");
-			Serial.print(create_LRC_ack(recieved_message) == recieved_message.lrc);
 
-			Serial.print(" - Calculated LRC:");
-			Serial.println(create_LRC_ack(recieved_message));
-			*/
-		}
-
+		// Close the ResponseStructContainer rsc
 		rsc.close();
+
 		return true;
 	}
+
+	// If there is no message avaiable
 	else 
 	{
 		return false;
 	}
 }
 
-
+// Set configuration variables in the lora module. This is done through the ebyte e220ttl library. (This function is currently not used)
 void SetLoRaConfig()
 {
+	// Create a ResponseStructContainer and fill it with the configuration
 	ResponseStructContainer c;
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
 	Configuration configuration = *(Configuration *)c.data;
+
+	// Print configuration satus and parameters.
 	Serial.println(c.status.getResponseDescription());
 	Serial.println(c.status.code);
-
 	printParameters(configuration);
-
+	
+	// Configuration
 	configuration.ADDL = 0x03; // First part of address
 	configuration.ADDH = 0x00; // Second part
 
@@ -356,25 +331,28 @@ void SetLoRaConfig()
 	configuration.TRANSMISSION_MODE.fixedTransmission = FT_TRANSPARENT_TRANSMISSION; // Enable repeater mode
 	configuration.TRANSMISSION_MODE.enableLBT = LBT_DISABLED;						 // Check interference
 	configuration.TRANSMISSION_MODE.WORPeriod = WOR_2000_011;						 // WOR timing
+	// End of configuration
 
-	// Set configuration changed and set to not hold the configuration
+	// Set configuration changed and set to hold the configuration
 	ResponseStatus rs = e220ttl.setConfiguration(configuration, WRITE_CFG_PWR_DWN_SAVE);
 	Serial.println(rs.getResponseDescription());
 	Serial.println(rs.code);
 
+	// Create a ResponseStructContainer and fill it with the configuration (again)
 	c = e220ttl.getConfiguration();
 	// It's important get configuration pointer before all other operation
 	configuration = *(Configuration *)c.data;
+	
+	// Print configuration satus and parameters.
 	Serial.println(c.status.getResponseDescription());
 	Serial.println(c.status.code);
-
 	printParameters(configuration);
-	c.close();
 
-	
+	// Close the ResponseStructContainer c
+	c.close();
 }
 
-
+// Print the configuration parameters of the lora module. (from LoRa library)
 void printParameters(struct Configuration configuration) 
 {
 	DEBUG_PRINTLN("----------------------------------------");
@@ -403,7 +381,7 @@ void printParameters(struct Configuration configuration)
 	DEBUG_PRINTLN("----------------------------------------");
 }
 
-
+// Print module information of the lora module. (from LoRa library)
 void printModuleInformation(struct ModuleInformation moduleInformation) 
 {
 	Serial.println("----------------------------------------");
@@ -417,10 +395,11 @@ void printModuleInformation(struct ModuleInformation moduleInformation)
 }
 
 // A function that counts all bits in the acknowledge struct.
-int create_LRC_ack(message_ack_struct message)
+int create_LRC_ack(response_message_struct message)
 {
 	int tot = 0;
-
+	
+	// Count all bits in the message (except the LRC)
 	tot += count_bits(message.soc);
 	tot += count_bits(message.pl);
 	tot += count_bits(message.src_ID);
@@ -437,6 +416,8 @@ int create_LRC_ack(message_ack_struct message)
 int create_LRC(message_struct message)
 {
 	int tot = 0;
+	
+	// Count all bits in the message (except the LRC)
 	tot += count_bits(message.soc);
 	tot += count_bits(message.pl);
 	tot += count_bits(message.src_ID);
@@ -461,14 +442,16 @@ int count_bits(int num)
 {
 	int tot = 0;
 
+	// While there are still bits in the number
 	while (num)
 	{
+		// total ++ if the LSB of the number is 1.
 		if (num & 0x01)
 		{
 			// if LSB is 1, tot++
 			tot++;
 		}
-
+		
 		// Shift all bits 1 to the right
 		num >>= 1;
 	}

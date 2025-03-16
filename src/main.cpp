@@ -1,5 +1,3 @@
-
- 
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
 #define messageTimeout 1000
@@ -55,7 +53,7 @@ sensordata_struct sensordata_buffer[256];
 char timing_ID = 0;
 char message_times[] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 unsigned long time_last_message_send;
-int heartbeat_sampleinterval;
+int datasample_interval;
 bool lastmessage_done = false;
 bool data_pulled = true; //Init with true so that first sample can be taken and newdata_avail becomes true
 bool newdata_available = false;
@@ -159,7 +157,6 @@ void setup()
 
 void lora_TXRX(void *pvParameters) {
     for (;;) { // Infinite loop
-
 		// If there is new data available and the last message is sent and acknowledged, send the new data
 		if(newdata_available && lastmessage_done){
 
@@ -200,7 +197,7 @@ void lora_TXRX(void *pvParameters) {
 				Serial.print(" - t: (");
 				Serial.print(millis());
 				Serial.println(")");
-				Serial.println(" ");
+				Serial.println(" ");                 
 				// END Debug message
 
 				//Mark verification routine as done
@@ -265,17 +262,22 @@ void loop()
 {
 	// Collect and process sensor data
 	// Calculate optimal sample interval for heartbeat sensor based on the rolling average latency of the last 10 messages
-	heartbeat_sampleinterval = rolling_averagetime() / 59;
+	datasample_interval = rolling_averagetime() / 59;
 
 	// Wait for data to be pulled in task 0
 	if(data_pulled){
 		newdata_available = false;
 
 		// Collect sensor data when last message is sent and acknowledged
-		for(int i = 0; i < 59; i++){
-			live_data.heartbeat[i] = analogRead(34);
-			live_data.pressure_sensor[i] = analogRead(35);
-			delay(heartbeat_sampleinterval);
+		for(int i = 0; i < 59; i++)
+		{
+			live_data.heartbeat[i] = map(analogRead(25), 0, 4095, 0, 32767);
+			live_data.pressure_sensor[i] = map(analogRead(35), 0, 4095, 0, 255);
+			
+			//Serial.println(map(analogRead(25), 0, 4095, 0, 32767));
+			//Serial.println(live_data.heartbeat[i]);
+			delay(datasample_interval);
+			//Serial.println(datasample_interval);
 		}
 
 		live_data.moisture_sensor = analogRead(33);
@@ -285,7 +287,6 @@ void loop()
 		newdata_available = true;
 		data_pulled = false;
 	}
-	
 
 
 }

@@ -134,8 +134,8 @@
 			// If the LoRa module is in the proces of recieving data, print the last heartbeat value.
 
 			// ----------------------- TODO: CHANGE, BECAUSE THE WHOLE ARRAY CHANGES, THIS WILL NOT WORK AS EXPECTED -----------------------
-			Serial.println(verifiedMessage.data.heartbeat[58]);
-			delayMicroseconds(2000);
+			//Serial.println(verifiedMessage.data.heartbeat[58]);
+			//delayMicroseconds(2000);
 		}
 	}
 

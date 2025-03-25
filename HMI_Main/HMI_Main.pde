@@ -4,61 +4,124 @@ import controlP5.*;
 Serial port;
 int[] heartbeat_values;  // Store heartbeat values
 int[] pressure_values;  // Store pressure values
-int maxValues = 10000;  // Number of points displayed (horizontal resolution)
+int maxValues = 5000;  // Number of points displayed (horizontal resolution)
 float yScale;
+float ECG_scale = 0;
 
 
 ControlP5 p5;
 
-// Buttons
-Button zoom_plus;
-Button zoom_min;
 
-void setup() {
-  size(2000, 1000);  
+// Buttons and sliders
+Slider ECG_slider;
+
+void setup() 
+{
 
   p5 = new ControlP5(this);
-  // String serial = Serial.list()[0];  // Change if needed
-  // port = new Serial(this, serial, 115200);
+
+  String serial = Serial.list()[2];  // Change if needed
+  port = new Serial(this, serial, 115200);
   heartbeat_values = new int[maxValues];  // Initialize array for heartbeat sensor values
   pressure_values = new int[maxValues];  // Initialize array for pressure sensor values
   yScale = height / 4096.0;  // Scale for 12-bit ADC
 
-  zoom_plus = p5.addButton("zoom_plus").setPosition(250, 100).setSize(100, 50).setLabel("Zoom +");
-  zoom_min = p5.addButton("zoom_min").setPosition(100, 100).setSize(100, 50).setLabel("Zoom -");
+
+  
+  // ECG_slider
+  ECG_slider = p5.addSlider("ECG_slider")
+                  .setPosition(width * 0.02, height * 0.34)
+                  .setSize(int(width * 0.25), int(height * 0.03))
+                  .setNumberOfTickMarks(10)
+                  .snapToTickMarks(true)
+                  .setRange(0, 0.15)
+                  .setValue(0.03)
+                  .setLabel("ECG Scale");
+                  
+  
 }
 
 
-void draw() {
+void draw() 
+{
   background(0);
   stroke(255);
   noFill();
 
-  // Draw graph
+
+  // Slider & button positions (for scaling purposes)
+  ECG_slider.setPosition(width * 0.02, height * 0.34)
+            .setSize(int(width * 0.25), int(height * 0.03));
+
+
+  // Draw graph outlines
+  stroke(255, 0, 0); // Red
+  rect( width * 0.02, 
+        height * 0.03, 
+        width * 0.75, 
+        height * 0.3
+        );  
+
+  stroke(153, 255, 255); // Light Blue
+  rect( width * 0.02, 
+        (height * 0.3 + height * 0.03) + height * 0.05, 
+        width * 0.75, 
+        height * 0.3
+        );
+
+  // End of graph outlines
+
+
+  // Draw ECG graph
   beginShape();
-  for (int i = 0; i < heartbeat_values.length; i++) {
-    float x = map(i, 0, heartbeat_values.length, 0, width);
-    float y = height - heartbeat_values[i] * yScale;
+  stroke(255, 0, 0); // Red
+  for (int i = 0; i < heartbeat_values.length; i++) 
+  {
+    float x = map(i, 
+                  0, 
+                  heartbeat_values.length, 
+                  width * 0.03, 
+                  width * 0.02 + width * 0.74
+                  );
+
+    float y = map(heartbeat_values[i],  // ECG is upside down, flip it 180 degrees
+                  2800, 
+                  500, 
+                  height * 0.03 + height * -ECG_scale, 
+                  height * 0.27 + height * ECG_scale
+                  );
+
+
+    // Limit the y values to the graph area
+    y = min(height * 0.3 + height * 0.03, y);
+    y = max(height * 0.03, y);
     vertex(x, y);
   }
   endShape();
 
+
 }
 
 // Read Serial Data
-void serialEvent(Serial port) {
+void serialEvent(Serial port)
+{
   String line = port.readStringUntil('\n');
-  if (line != null) {
+  if (line != null) 
+  {
     line = trim(line); // Trims whitespaces from beginning and end of string
 
-    if (line.length() > 0) { // Check if the line is not empty after the trim
+    if (line.length() > 0) // Check if the line is not empty after the trim
+    { 
 
-      switch (line[0]) {
+      switch (line.charAt(0)) 
+      {
         case 'h': // Heartbeat
-          
-          int val = int(line);
+
+          line = line.substring(1); // Remove the first character from the string  
+          int val = int(line); // Extract the value from the string (remove first character)
           heartbeat_values = append(heartbeat_values, val);
-          if (values.length > maxValues) {
+          if (heartbeat_values.length > maxValues) 
+          {
             heartbeat_values = subset(heartbeat_values, 1);  // Remove first value and shift all values to the left
           }
 
@@ -76,13 +139,18 @@ void serialEvent(Serial port) {
           break;
 
         default:  // unknown / Garbage
-          
+          println("UNKNOWN VALUE");
           break;
       }
     }
   }
 }
 
-public void zoom_plus(int theValue) {
-  println("ASDJAKSD");
+public void ECG_slider(float theValue) {
+  ECG_scale = theValue;
+}
+
+public void settings() {
+ size(1920, 700, P2D);
+
 }

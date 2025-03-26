@@ -8,19 +8,21 @@ int maxValues = 5000;  // Number of points displayed (horizontal resolution)
 float yScale;
 float ECG_scale = 0;
 
-
 ControlP5 p5;
 
 
 // Buttons and sliders
 Slider ECG_slider;
 
+PFont valueFont;
+PFont unitFont;
+
 void setup() 
 {
 
   p5 = new ControlP5(this);
 
-  String serial = Serial.list()[2];  // Change if needed
+  String serial = Serial.list()[0];  // Change if needed
   port = new Serial(this, serial, 115200);
   heartbeat_values = new int[maxValues];  // Initialize array for heartbeat sensor values
   pressure_values = new int[maxValues];  // Initialize array for pressure sensor values
@@ -35,7 +37,6 @@ void setup()
                   .setNumberOfTickMarks(10)
                   .snapToTickMarks(true)
                   .setRange(0, 0.15)
-                  .setValue(0.03)
                   .setLabel("ECG Scale");
                   
   
@@ -44,6 +45,11 @@ void setup()
 
 void draw() 
 {
+  // Ceate fonts
+  valueFont = createFont("Arial", width * 0.08);
+  unitFont = createFont("Arial", width * 0.02);
+
+
   background(0);
   stroke(255);
   noFill();
@@ -72,6 +78,15 @@ void draw()
   // End of graph outlines
 
 
+  // Text
+  textFont(valueFont);
+  fill(255, 0, 0);
+  String bpm = "65";
+  text(bpm, width * 0.78, height * 0.25);
+
+  textFont(unitFont);
+  text("BPM", width * 0.78 + width * 0.15, height * 0.25);
+  
   // Draw ECG graph
   beginShape();
   stroke(255, 0, 0); // Red

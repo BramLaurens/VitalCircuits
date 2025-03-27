@@ -205,7 +205,7 @@ void lora_TXRX(void *pvParameters)
 		
 		}
 
-		// Wait for response
+		// Wait for response (acknowledge or retransmit)
 		if (ReceiveLoRa()) 
 		{
 			// A message was recieved

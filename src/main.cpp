@@ -136,16 +136,6 @@ void setup()
     pinMode(MOISTURE_PIN, INPUT);  // Moisture sensor
     pinMode(TEMPERATURE_PIN, INPUT);  // Temperature sensor
 
-	// -- THE FOLLOWING CODE IS FOR TESTING PURPOSES ONLY --
-	// fill test_data
-	for (int i = 0; i < 59; i++)
-	{
-		test_data.pressure_sensor[i] = i;
-		test_data.heartbeat[i] = i;
-	}
-	// -- THE ABOVE CODE IS FOR TESTING PURPOSES ONLY --
-
-
 	// Fill protocol
 	message.soc = 0x7E; 									// Self chosen value
 	message.src_ID = 0x04;									// Source ID - 0000 0001 In our case (EV1A Group 4)

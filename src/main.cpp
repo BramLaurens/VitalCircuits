@@ -122,7 +122,7 @@ void setup()
 void loop()
 {
 	if (message_recieved)
-	// If a message is recieved and verified, print all heartbeat values.
+	// If a message is recieved, verified and not yet processed, print all heartbeat values.
 	{
 		for (char i = 0; i < 59; i++) 
 		{

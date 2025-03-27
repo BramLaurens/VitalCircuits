@@ -189,7 +189,7 @@ void lora_TXRX(void *pvParameters)
 		// If there is new data available and the last message is sent and acknowledged, send the new data
 		if(newdata_available && lastmessage_done){
 
-			// Reset variables, stop task 1 from putting new data in the live buffer
+			// Reset variables, stop task 0 from putting new data in the live buffer
 			lastmessage_done = false;
 			message.p_ID++; // NOTE: we start with packet 1. This makes resending packets easier.
 

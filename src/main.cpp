@@ -1,23 +1,22 @@
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
-#define messageTimeout 1000
+#define MESSAGE_TIMEOUT 1000
 #include "Arduino.h"
 #include "LoRa_E220.h"
 
 TaskHandle_t TXRX_task;
 
-
 // ---------- esp32 pins --------------
-LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  RX AUX M0 M1
+LoRa_E220 e220ttl(&Serial2, 15, 21, 19); // (RX TX) AUX M0 M1
 
 
 // Define the struct for the sensordata
 struct sensordata_struct
 {
     unsigned char pressure_sensor[59];        // 0 - 255
-    int temperature_sensor;               // -32,768 - 32,767
-    short unsigned int moisture_sensor;   // 0 - 65,535
-    short int heartbeat[59];                // -32,768 - 32,767
+    int temperature_sensor;                   // -32,768 - 32,767
+    short unsigned int moisture_sensor;   	  // 0 - 65,535
+    short int heartbeat[59];				  // -32,768 - 32,767
 };
 
 // Define the struct for the output message
@@ -34,7 +33,7 @@ struct message_struct
 char eot;
 };
 
-// Define the struct for the output message
+// Define the struct for the input message
 struct response_message_struct
 {
 	char soc;
@@ -76,6 +75,8 @@ int rolling_averagetime();
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
 sensordata_struct test_data;
+
+// Create a sensordata struct to store the live data
 sensordata_struct live_data;
 
 // Create a message struct to store the message to be sent
@@ -116,8 +117,6 @@ void setup()
 	message.eot = 0xA4; 									// Self chosen value
 	message.pl = sizeof(message) - sizeof(message.lrc);		// Payload length - 1 byte
 	
-	
-
 
 	// Begin communication to the LoRa module
 	// Startup all pins and UART
@@ -155,8 +154,11 @@ void setup()
 	Serial2.begin(115200);
 }
 
-void lora_TXRX(void *pvParameters) {
-    for (;;) { // Infinite loop
+// TXRX loop, this loop is used to send and recieve messages from the lora module.
+void lora_TXRX(void *pvParameters) 
+{
+    for (;;) 
+	{ // Infinite loop
 		// If there is new data available and the last message is sent and acknowledged, send the new data
 		if(newdata_available && lastmessage_done){
 
@@ -244,7 +246,7 @@ void lora_TXRX(void *pvParameters) {
 		}
 
 		// If there is no message available, check if the last message was send more than 85 ms ago
-		else if (millis() - time_last_message_send > messageTimeout)
+		else if (millis() - time_last_message_send > MESSAGE_TIMEOUT)
 		{
 			// Last message is more than 85 ms ago - resend the message
 
@@ -258,6 +260,7 @@ void lora_TXRX(void *pvParameters) {
     }
 }
 
+// Main Loop, this loop is used to collect sensor data and process it.
 void loop()
 {
 	// Collect and process sensor data
@@ -265,7 +268,8 @@ void loop()
 	datasample_interval = rolling_averagetime() / 59;
 
 	// Wait for data to be pulled in task 0
-	if(data_pulled){
+	if(data_pulled)
+	{
 		newdata_available = false;
 
 		// Collect sensor data when last message is sent and acknowledged
@@ -291,7 +295,7 @@ void loop()
 
 }
 
-// Send a message through the lora module.
+// A function that sends a message to the lora module.
 void send_message(message_struct message) 
 {
 	// Save sensor data in buffer
@@ -334,13 +338,15 @@ void send_message(message_struct message)
 	timing_ID++;
 
 	//	Go back to the first position if the timing array is full
-	if(timing_ID > 9){
+	if(timing_ID > 9)
+	{
 		timing_ID = 0;
 	}
 
 	Serial.print(" - Timing: ");
 	// Print the timing array
-	for(int i = 0; i < 10; i++){
+	for(int i = 0; i < 10; i++)
+	{
 		Serial.print(message_times[i], DEC);
 		Serial.print(" ");
 	}
@@ -349,7 +355,8 @@ void send_message(message_struct message)
 	Serial.println(" ");
 }
 
-// Recieve a message from the lora module.
+// A function that receives a message from the lora module.
+// This function returns a boolean, true if a message was received, false if no message was received.
 bool ReceiveLoRa(){
 	// If there is a message avaiable
 	if (e220ttl.available())
@@ -381,7 +388,8 @@ bool ReceiveLoRa(){
 	}
 }
 
-// Set configuration variables in the lora module. This is done through the ebyte e220ttl library. (This function is currently not used)
+// Set LoRa module configuration
+// This function is not called, since the LoRa module is already configured and set to remember the configuration
 void SetLoRaConfig()
 {
 	// Create a ResponseStructContainer and fill it with the configuration
@@ -434,7 +442,7 @@ void SetLoRaConfig()
 	c.close();
 }
 
-// Print the configuration parameters of the lora module. (from LoRa library)
+// A function that prints the LoRa module configuration
 void printParameters(struct Configuration configuration) 
 {
 	DEBUG_PRINTLN("----------------------------------------");
@@ -463,7 +471,7 @@ void printParameters(struct Configuration configuration)
 	DEBUG_PRINTLN("----------------------------------------");
 }
 
-// Print module information of the lora module. (from LoRa library)
+// A function that prints the LoRa module information
 void printModuleInformation(struct ModuleInformation moduleInformation) 
 {
 	Serial.println("----------------------------------------");
@@ -476,25 +484,7 @@ void printModuleInformation(struct ModuleInformation moduleInformation)
 
 }
 
-// A function that counts all bits in the acknowledge struct.
-int create_LRC_ack(response_message_struct message)
-{
-	int tot = 0;
-	
-	// Count all bits in the message (except the LRC)
-	tot += count_bits(message.soc);
-	tot += count_bits(message.pl);
-	tot += count_bits(message.src_ID);
-	tot += count_bits(message.des_ID);
-	tot += count_bits(message.p_ID);
-	tot += count_bits(message.functiecode);
-	tot += count_bits(message.ack_ID);
-	tot += count_bits(message.eot);
-
-	return tot;
-}
-
-// A function that counts all bits in the message struct.
+// A function that counts all bits in a message
 int create_LRC(message_struct message)
 {
 	int tot = 0;
@@ -515,6 +505,24 @@ int create_LRC(message_struct message)
 		tot += count_bits(message.data.pressure_sensor[i]);
 		tot += count_bits(message.data.heartbeat[i]);
 	}
+
+	return tot;
+}
+
+// A function that coults all bits in an acknowledgement message
+int create_LRC_ack(response_message_struct message)
+{
+	int tot = 0;
+	
+	// Count all bits in the message (except the LRC)
+	tot += count_bits(message.soc);
+	tot += count_bits(message.pl);
+	tot += count_bits(message.src_ID);
+	tot += count_bits(message.des_ID);
+	tot += count_bits(message.p_ID);
+	tot += count_bits(message.functiecode);
+	tot += count_bits(message.ack_ID);
+	tot += count_bits(message.eot);
 
 	return tot;
 }
@@ -541,6 +549,7 @@ int count_bits(int num)
 	return tot;
 }
 
+// A function that gets the LoRa module configuration
 void getLoRaConfig()
 {
 	ResponseStructContainer c;
@@ -554,6 +563,7 @@ void getLoRaConfig()
 	c.close();
 }
 
+// A function that calculates the rolling average of the last 10 message_times (the time it took to send a message)
 int rolling_averagetime()
 {
 	int sum = 0;

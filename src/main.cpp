@@ -23,15 +23,15 @@ struct sensordata_struct
 // Define struct for message
 struct message_struct
 {
-char soc;
-char pl;
-char src_ID;
-char des_ID;
-unsigned char p_ID;
-char functiecode;
-sensordata_struct data;
-int lrc;   
-char eot;
+	char soc;
+	char pl;
+	char src_ID;
+	char des_ID;
+	unsigned char p_ID;
+	char functiecode;
+	sensordata_struct data;
+	int lrc;   
+	char eot;
 };
 
 // Define struct for acknowledgement message

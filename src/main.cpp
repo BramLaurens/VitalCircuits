@@ -1,8 +1,20 @@
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
 #define MESSAGE_TIMEOUT 1000
+
+#define ECG_PIN 34
+#define PRESSURE_PIN 35
+#define MOISTURE_PIN 33
+#define TEMPERATURE_PIN 32
+
+// COMMENT OR UNCOMMENT DEBUG STATEMENTS FOR DEBUGGING OPTIONS
+	// #define comms_debug
+	// #define temp_debug
+// END OF DEBUG STATEMENTS
+
 #include "Arduino.h"
 #include "LoRa_E220.h"
+#include <math.h>
 
 TaskHandle_t TXRX_task;
 
@@ -65,6 +77,7 @@ void send_message(message_struct message);
 bool ReceiveLoRa();
 void getLoRaConfig();
 void lora_TXRX(void *pvParameters);
+double temp_calc();
 
 int create_LRC(message_struct message);
 int create_LRC_ack(response_message_struct message);
@@ -92,10 +105,10 @@ void setup()
 	Serial2.begin(9600, SERIAL_8N1, 16, 17);  				// For communication to the LoRa module
 	delay(500);												// Give the Serial some time to initialize
 
-	pinMode(35, INPUT);  // Pressure sensor
-    pinMode(34, INPUT);  // Heartbeat sensor
-    pinMode(33, INPUT);  // Moisture sensor
-    pinMode(32, INPUT);  // Temperature sensor
+	pinMode(PRESSURE_PIN, INPUT);  // Pressure sensor
+    pinMode(ECG_PIN, INPUT);  // Heartbeat sensor
+    pinMode(MOISTURE_PIN, INPUT);  // Moisture sensor
+    pinMode(TEMPERATURE_PIN, INPUT);  // Temperature sensor
 
 	// -- THE FOLLOWING CODE IS FOR TESTING PURPOSES ONLY --
 	// fill test_data
@@ -137,7 +150,7 @@ void setup()
 	// Set configuration
 	// SetLoRaConfig();
 
-	//Create a task to send data and pin it to core 1
+	//Create a task to send data and pin it to core 0
 	xTaskCreatePinnedToCore(
         lora_TXRX, 
         "TXRX_task",
@@ -154,7 +167,7 @@ void setup()
 	Serial2.begin(115200);
 }
 
-// TXRX loop, this loop is used to send and recieve messages from the lora module.
+// TXRX loop, this loop is used to send and recieve messages from the lora module and runs on a different core
 void lora_TXRX(void *pvParameters) 
 {
     for (;;) 
@@ -250,9 +263,11 @@ void lora_TXRX(void *pvParameters)
 		{
 			// Last message is more than 85 ms ago - resend the message
 
-			Serial.print("WARNING - Got no acknowledge for message: ");
-			Serial.print(message.p_ID, DEC);
-			Serial.println(" - Resending message.");
+			#ifdef comms_debug
+				Serial.print("WARNING - Got no acknowledge for message: ");
+				Serial.print(message.p_ID, DEC);
+				Serial.println(" - Resending message.");
+			#endif
 
 			// Resend message
 			send_message(message);
@@ -270,6 +285,7 @@ void loop()
 	// Wait for data to be pulled in task 0
 	if(data_pulled)
 	{
+		//Mark that new data is not available right now so that TXRX wont send the same data again
 		newdata_available = false;
 
 		// Collect sensor data when last message is sent and acknowledged
@@ -287,12 +303,48 @@ void loop()
 		live_data.moisture_sensor = analogRead(33);
 		live_data.temperature_sensor = analogRead(32);
 
-		// Flag new data as available and not pulled yet
+		// Flag new data as available and not pulled yet so that TXRX can send the data
 		newdata_available = true;
 		data_pulled = false;
 	}
 
 
+
+}
+
+double temp_calc()
+{
+	float temp_raw = analogRead(TEMPERATURE_PIN);
+	float v_diff = (temp_raw * 3.3 / 4095) / 3.704;
+	float v_ntc = 1.57 - v_diff;
+	float I_ntc = (3.31 - v_ntc) / 10000;
+	float r_ntc = v_ntc / I_ntc;
+	double lnR = log(r_ntc);
+
+	float tempK = 1 / (2.386e-3 + 0.169e-4 * lnR + 10.14e-7 * pow(lnR, 3));
+	double tempC = tempK - 273.15 + 4;
+
+	#ifdef temp_debug
+		Serial.print("temp_raw: ");
+		Serial.print(temp_raw);
+		Serial.print("	v_diff: ");
+		Serial.print(v_diff);
+		Serial.print("	v_ntc: ");
+		Serial.print(v_ntc);
+		Serial.print("	I_ntc: ");
+		Serial.print(I_ntc);
+		Serial.print("	r_ntc: ");
+		Serial.print(r_ntc);
+		Serial.print("	lnR: ");
+		Serial.print(lnR);
+		Serial.print("	tempK: ");
+		Serial.print(tempK);
+		Serial.print("	tempC: ");
+		Serial.println(tempC);
+	#endif
+
+	delay(100);
+	return tempC;
 }
 
 // A function that sends a message to the lora module.
@@ -305,11 +357,13 @@ void send_message(message_struct message)
 	message.lrc = create_LRC(message);
 	
 	// Debug message
-	Serial.println("SENT MESSAGE");
-	Serial.print("(t: ");
-	int timer = millis();
-	Serial.print(timer);
-	Serial.print(") - Status: ");
+	#ifdef comms_debug
+		Serial.println("SENT MESSAGE");
+		Serial.print("(t: ");
+		int timer = millis();
+		Serial.print(timer);
+		Serial.print(") - Status: ");
+	#endif
 	// END Debug message
 
 
@@ -319,14 +373,16 @@ void send_message(message_struct message)
 
 
 	// Debug message
-	Serial.print(rs.getResponseDescription());
-	Serial.print(" (t: ");
-	Serial.print(millis());
-	Serial.print(") - Diff: (");
-	Serial.print(millis() - timer);
-	Serial.print(") ");
-	Serial.print(" - p_ID: ");
-	Serial.print(message.p_ID, DEC);
+	#ifdef comms_debug
+		Serial.print(rs.getResponseDescription());
+		Serial.print(" (t: ");
+		Serial.print(millis());
+		Serial.print(") - Diff: (");
+		Serial.print(millis() - timer);
+		Serial.print(") ");
+		Serial.print(" - p_ID: ");
+		Serial.print(message.p_ID, DEC);
+	#endif
 	// END Debug message
 
 
@@ -343,16 +399,18 @@ void send_message(message_struct message)
 		timing_ID = 0;
 	}
 
-	Serial.print(" - Timing: ");
-	// Print the timing array
-	for(int i = 0; i < 10; i++)
-	{
-		Serial.print(message_times[i], DEC);
-		Serial.print(" ");
-	}
-	Serial.print(" - Average: ");
-	Serial.println(rolling_averagetime());
-	Serial.println(" ");
+	#ifdef comms_debug
+		Serial.print(" - Timing: ");
+		// Print the timing array
+		for(int i = 0; i < 10; i++)
+		{
+			Serial.print(message_times[i], DEC);
+			Serial.print(" ");
+		}
+		Serial.print(" - Average: ");
+		Serial.println(rolling_averagetime());
+		Serial.println(" ");
+	#endif
 }
 
 // A function that receives a message from the lora module.

@@ -1,3 +1,12 @@
+// COMMENT OR UNCOMMENT DEBUG STATEMENTS FOR DEBUGGING OPTIONS
+	// #define comms_debug
+	// #define temp_debug
+	// #define moist_debug
+	// #define bpm_debug
+	// #define pressure_debug
+	#define packed_data_debug
+// END OF DEBUG STATEMENTS
+
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
 #define MESSAGE_TIMEOUT 1000
@@ -7,10 +16,11 @@
 #define MOISTURE_PIN 33
 #define TEMPERATURE_PIN 32
 
-// COMMENT OR UNCOMMENT DEBUG STATEMENTS FOR DEBUGGING OPTIONS
-	// #define comms_debug
-	// #define temp_debug
-// END OF DEBUG STATEMENTS
+// BPM definitions
+#define BPM_BUFFER_SIZE 10  // Moving average buffer size
+#define BPM_PEAK_THRESHOLD_FACTOR 0.6  // Adaptive threshold factor
+#define BPM_MIN_RR_INTERVAL 300  // Minimum time between R-peaks (ms)
+#define BPM_NOISE_THRESHOLD 500  // Ignore peaks below this value
 
 #include "Arduino.h"
 #include "LoRa_E220.h"
@@ -27,8 +37,9 @@ struct sensordata_struct
 {
     unsigned char pressure_sensor[59];        // 0 - 255
     int temperature_sensor;                   // -32,768 - 32,767
-    short unsigned int moisture_sensor;   	  // 0 - 65,535
+    unsigned char moisture_sensor;   	  // 0 - 65,535
     short int heartbeat[59];				  // -32,768 - 32,767
+	char heartbeat_bpm;
 };
 
 // Define the struct for the output message
@@ -69,6 +80,13 @@ bool lastmessage_done = false;
 bool data_pulled = true; //Init with true so that first sample can be taken and newdata_avail becomes true
 bool newdata_available = false;
 
+unsigned long bpm_lastpeakTime = 0;
+float bpmBuffer[BPM_BUFFER_SIZE];
+int bpm_bufferindex = 0;
+bool bpm_bufferfilled = false;
+float bpm_peakthreshold = 0;
+float bpm = 0;
+
 // Protoypes
 void printParameters(struct Configuration configuration);
 void printModuleInformation(struct ModuleInformation moduleInformation);
@@ -77,13 +95,21 @@ void send_message(message_struct message);
 bool ReceiveLoRa();
 void getLoRaConfig();
 void lora_TXRX(void *pvParameters);
+
+void data_samplepack();
+
 double temp_calc();
+float moist_calc();
 
 int create_LRC(message_struct message);
 int create_LRC_ack(response_message_struct message);
 int count_bits(int num);
 
 int rolling_averagetime();
+
+void updateBPMBuffer(float bpm);
+void BPM_counter();
+float getAverageBPM();
 
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
@@ -117,8 +143,6 @@ void setup()
 		test_data.pressure_sensor[i] = i;
 		test_data.heartbeat[i] = i;
 	}
-	test_data.temperature_sensor = 12345;
-	test_data.moisture_sensor = 54321;
 	// -- THE ABOVE CODE IS FOR TESTING PURPOSES ONLY --
 
 
@@ -278,6 +302,12 @@ void lora_TXRX(void *pvParameters)
 // Main Loop, this loop is used to collect sensor data and process it.
 void loop()
 {
+	BPM_counter();
+	data_samplepack();
+
+}
+
+void data_samplepack(){
 	// Collect and process sensor data
 	// Calculate optimal sample interval for heartbeat sensor based on the rolling average latency of the last 10 messages
 	datasample_interval = rolling_averagetime() / 59;
@@ -285,31 +315,67 @@ void loop()
 	// Wait for data to be pulled in task 0
 	if(data_pulled)
 	{
+		#ifdef packed_data_debug
+			Serial.print("Packed data in live: ");
+		#endif
+
 		//Mark that new data is not available right now so that TXRX wont send the same data again
 		newdata_available = false;
 
 		// Collect sensor data when last message is sent and acknowledged
 		for(int i = 0; i < 59; i++)
 		{
-			live_data.heartbeat[i] = map(analogRead(25), 0, 4095, 0, 32767);
-			live_data.pressure_sensor[i] = map(analogRead(35), 0, 4095, 0, 255);
-			
-			//Serial.println(map(analogRead(25), 0, 4095, 0, 32767));
-			//Serial.println(live_data.heartbeat[i]);
+			live_data.heartbeat[i] = map(analogRead(ECG_PIN), 0, 4095, 0, 32767);
+			live_data.pressure_sensor[i] = map(analogRead(PRESSURE_PIN), 0, 4095, 0, 255);
+
+			#ifdef packed_data_debug
+				Serial.print(" H:");
+				Serial.print(live_data.heartbeat[i]);
+				Serial.print(" P:");
+				Serial.println(live_data.pressure_sensor[i]);
+			#endif
+
 			delay(datasample_interval);
-			//Serial.println(datasample_interval);
 		}
 
-		live_data.moisture_sensor = analogRead(33);
-		live_data.temperature_sensor = analogRead(32);
+		live_data.moisture_sensor = moist_calc();
+		live_data.temperature_sensor = temp_calc();
+		live_data.heartbeat_bpm = getAverageBPM();
+
+		#ifdef packed_data_debug
+			Serial.print(" Moist: ");
+			Serial.print(live_data.moisture_sensor);
+			Serial.print(" Temp: ");
+			Serial.println(live_data.temperature_sensor);
+		#endif
 
 		// Flag new data as available and not pulled yet so that TXRX can send the data
 		newdata_available = true;
 		data_pulled = false;
 	}
+}
 
+float moist_calc(){
+	int moist_raw = analogRead(MOISTURE_PIN);
+	int moist_perc = map(moist_raw, 1000, 1300, 100, 0);
 
+	if(moist_perc < 0)
+	{
+		moist_perc = 0;
+	}
+	else if(moist_perc > 100)
+	{
+		moist_perc = 100;
+	}
 
+	#ifdef moist_debug
+		Serial.print("moist_raw: ");
+		Serial.print(moist_raw);
+		Serial.print("	moist_perc: ");
+		Serial.println(moist_perc);
+	#endif
+
+	return moist_perc;
 }
 
 double temp_calc()
@@ -342,8 +408,7 @@ double temp_calc()
 		Serial.print("	tempC: ");
 		Serial.println(tempC);
 	#endif
-
-	delay(100);
+	
 	return tempC;
 }
 
@@ -629,4 +694,77 @@ int rolling_averagetime()
 		sum += message_times[i];
 	}
 	return sum/10;
+}
+
+void BPM_counter(){
+    static float lastValue = 0;
+    static float maxECG = 0;
+    unsigned long currentTime = millis();
+    
+    // Read ECG signal
+    float ecgValue = analogRead(ECG_PIN);
+    
+    // Update peak threshold dynamically
+    if (ecgValue > maxECG) {
+        maxECG = ecgValue;
+        bpm_peakthreshold = maxECG * BPM_PEAK_THRESHOLD_FACTOR;
+    }
+
+    // Reset maxECG every 2 seconds
+    if (currentTime - bpm_lastpeakTime > 2000) {  
+        maxECG = 0;
+    }
+    
+    // Reset BPM after 5 seconds of inactivity
+    if (currentTime - bpm_lastpeakTime > 4000) {  
+        bpm = 0;
+        updateBPMBuffer(bpm);
+    }
+
+    // Detect peaks
+    if (ecgValue > bpm_peakthreshold && ecgValue > BPM_NOISE_THRESHOLD && lastValue <= bpm_peakthreshold) {
+        unsigned long rrInterval = currentTime - bpm_lastpeakTime;
+        if (rrInterval > BPM_MIN_RR_INTERVAL) {  // Ignore noise and too-fast beats
+            bpm = 60000.0 / rrInterval;
+            updateBPMBuffer(bpm);
+            bpm_lastpeakTime = currentTime;
+        }
+    }
+    
+    lastValue = ecgValue;
+
+	#ifdef bpm_debug
+		Serial.print("Instant BPM: ");
+		Serial.print(bpm);
+		Serial.print("  ||  Average BPM: ");
+		Serial.println(getAverageBPM());
+	#endif
+}
+
+void updateBPMBuffer(float bpm) {
+    bpmBuffer[bpm_bufferindex] = bpm;
+    bpm_bufferindex = (bpm_bufferindex + 1) % BPM_BUFFER_SIZE;
+    if (bpm_bufferindex == 0) bpm_bufferfilled = true;
+}
+
+float getAverageBPM() {
+    float sum = 0;
+    int count;
+    if (!bpm_bufferfilled){
+      count = bpm_bufferindex;
+    }
+    else {
+      count = BPM_BUFFER_SIZE;
+    }
+
+    for (int i = 0; i < count; i++) {
+        sum += bpmBuffer[i];
+    }
+    
+    if(count > 0){
+      return sum / count;
+    }
+    else{
+      return 0;
+    }
 }

@@ -184,10 +184,9 @@ void reciever_loop(void *pvParameters)
 				break;
 			}
 		}
-		else 
-		{
-			delayMicroseconds(10);
-		}
+
+		// Add delay to not overload the task
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 	}
 }
 

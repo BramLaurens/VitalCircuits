@@ -6,7 +6,8 @@ int[] heartbeat_values;  // Store heartbeat values
 int[] pressure_values;  // Store pressure values
 int graph_max_length = 5000;  // Number of points displayed (horizontal resolution)
 float yScale;
-float ECG_scale = 0;
+float ecg_scale = 0;
+float ecg_shift_value = 0;
 float pressure_scale = 0;
 
 ControlP5 p5;
@@ -14,6 +15,7 @@ ControlP5 p5;
 
 // Buttons and sliders
 Slider ecg_slider;
+Slider ecg_shift_slider;
 Slider pressure_slider;
 
 Button create_screenshot;
@@ -36,6 +38,10 @@ int title_font_size = 110;
 
 // Other variables
 char current_screen = 0;
+String bpm_value = "-";
+String respiration_rate_value = "-";
+String temperature_value = "-";
+String moisture_value = "-";
 
 void setup() 
 {
@@ -70,6 +76,14 @@ void setup()
                   .setRange(0, 0.15)
                   .setLabel("ECG Scale")
                   .setFont(label_font);
+
+  // ecg_shift_slider
+  ecg_shift_slider = p5.addSlider("ecg_shift_slider")
+                      .setPosition(width * 0.46, height * 0.34)
+                      .setSize(int(width * 0.25), int(height * 0.03))
+                      .setRange(-0.1, 0.1)
+                      .setLabel("ECG Shift")
+                      .setFont(label_font);
                   
                   
   // pressure_slider
@@ -115,12 +129,6 @@ void setup()
 
 void draw() 
 {
-  // Update values
-  String bpm_value = "62";
-  String respiration_rate_value = "25";
-  String temperature_value = "36.5";
-  String moisture_value = "14";
-
   // Update font size
   value_font_size = int(width * 0.07);
   important_value_font_size = int(width * 0.1);
@@ -150,23 +158,30 @@ void draw()
   respiration_screen.setPosition(width * 0.9, height * 0.94)
                     .setSize(int(width * 0.1), int(height * 0.06));
 
+  ecg_slider.setPosition(width * 0.02, height * 0.34)
+            .setSize(int(width * 0.25), int(height * 0.03));
+
+  ecg_shift_slider.setPosition(width * 0.46, height * 0.34)
+                  .setSize(int(width * 0.25), int(height * 0.03));
+    
+  pressure_slider.setPosition(width * 0.02, height * 0.33 + height * 0.36)
+                 .setSize(int(width * 0.25), int(height * 0.03));
+
 
   if (current_screen == 0) 
+  // Home screen
   {
     noFill();
 
     // Show / hide control P5 elements
     ecg_slider.show();
+    ecg_shift_slider.show();
     pressure_slider.show();
     create_screenshot.show();
 
 
     // Slider & button positions (for scaling purposes)
-    ecg_slider.setPosition(width * 0.02, height * 0.34)
-              .setSize(int(width * 0.25), int(height * 0.03));
-    
-    pressure_slider.setPosition(width * 0.02, height * 0.33 + height * 0.36)
-                  .setSize(int(width * 0.25), int(height * 0.03));
+
 
     // Draw graph outlines
     stroke(255, 0, 0); // Red
@@ -270,9 +285,9 @@ void draw()
 
       float y = map(heartbeat_values[i],  // ECG is upside down, flip it 180 degrees
                     40000, 
-                    6000, 
-                    (height * 0.03) + height * -ECG_scale, 
-                    (height * 0.27) + height * ECG_scale
+                    0, 
+                    (height * 0.03) + height * -ecg_scale + (height * ecg_shift_value), 
+                    (height * 0.27) + height * ecg_scale + (height * ecg_shift_value)
                     );
 
 
@@ -298,23 +313,16 @@ void draw()
                     );
 
       float y = map(pressure_values[i],
-                    4096, 
                     0, 
+                    255, 
                     (height * 0.38) - height * pressure_scale, 
-                    (height * 0.68)
+                    height * 0.88
                     );
 
-     y = min(height * 0.68, y);
-     y = max(height * 0.38, y);
-    vertex(x, y);
-
-    /*
-    rect( width * 0.02, 
-          (height * 0.3 + height * 0.03) + height * 0.05, 
-          width * 0.75, 
-          height * 0.3
-          );
-    */
+      // Limit the y values to the graph area
+      y = min(height * 0.88, y);
+      y = max(height * 0.385, y);
+      vertex(x, y);
 
     }
     endShape();
@@ -322,14 +330,19 @@ void draw()
   }
 
   else if (current_screen == 1)
+  // ECG screen
   {
     noFill();
     // Show / hide control P5 elements
     pressure_slider.hide();
     ecg_slider.show();
+    ecg_shift_slider.show();
 
     ecg_slider.setPosition(width * 0.02, height * 0.92)
               .setSize(int(width * 0.25), int(height * 0.03));
+
+    ecg_shift_slider.setPosition(width * 0.46, height * 0.92)
+                    .setSize(int(width * 0.25), int(height * 0.03));
 
 
     // Text
@@ -367,19 +380,19 @@ void draw()
                     0, 
                     heartbeat_values.length, 
                     width * 0.03, 
-                    width * 0.02 + width * 0.74
+                    width * 0.02 + width * 0.77
                     );
 
       float y = map(heartbeat_values[i],  // ECG is upside down, flip it 180 degrees
-                    2800, 
-                    500, 
-                    (height * 0.03) + height * -ECG_scale, 
-                    (height * 0.27) + height * ECG_scale
+                    40000, 
+                    0,
+                    (height * 0.03) + height * -ecg_scale  + (height * ecg_shift_value) - (height * 0.1), 
+                    (height * 0.9) + height * ecg_scale + (height * ecg_shift_value) - (height * 0.1)
                     );
 
 
       // Limit the y values to the graph area
-      y = min(height * 0.87 + height * 0.03, y);
+      y = min(height * 0.9, y);
       y = max(height * 0.03, y);
       vertex(x, y);
     }
@@ -391,10 +404,12 @@ void draw()
   } 
 
   else if (current_screen == 2)
+  // Respiration screen
   {
     noFill();
     // Show / hide control P5 elements   
     ecg_slider.hide();
+    ecg_shift_slider.hide();
     pressure_slider.show();
 
     pressure_slider.setPosition(width * 0.02, height * 0.92)
@@ -435,19 +450,19 @@ void draw()
                     0, 
                     pressure_values.length, 
                     width * 0.03, 
-                    width * 0.02 + width * 0.74
+                    width * 0.02 + width * 0.77
                     );
 
-      float y = map(pressure_values[i],  // ECG is upside down, flip it 180 degrees
+      float y = map(pressure_values[i], 
                     0, 
-                    4096, 
-                    (height * 0.03) + height * -pressure_scale, 
-                    (height * 0.27) + height * pressure_scale
+                    255, 
+                    (height * 0.03) + height * -ecg_scale - (height * 0.1), 
+                    (height * 0.9) + height * ecg_scale - (height * 0.1)
                     );
 
 
       // Limit the y values to the graph area
-      y = min(height * 0.87 + height * 0.03, y);
+      y = min(height * 0.9, y);
       y = max(height * 0.03, y);
       vertex(x, y);
 
@@ -492,16 +507,21 @@ void serialEvent(Serial port)
             pressure_values = subset(pressure_values, 1);  // Remove first value and shift all values to the left
           }
 
-          
-
           break;
 
         case 't': // Temperature
-          
+          line = line.substring(1); // Remove the first character from the string  
+          temperature_value = line;
           break;
         
         case 'm': // Moisture
-          
+          line = line.substring(1); // Remove the first character from the string
+          moisture_value = line; 
+          break;
+
+        case 'b': // BPM ECG
+          line = line.substring(1); // Remove the first character from the string
+          bpm_value = line;
           break;
 
         default:  // unknown / Garbage
@@ -514,7 +534,12 @@ void serialEvent(Serial port)
 
 public void ecg_slider(float theValue) 
 {
-  ECG_scale = theValue;
+  ecg_scale = theValue;
+}
+
+public void ecg_shift_slider(float theValue) 
+{
+  ecg_shift_value = theValue;
 }
 
 

@@ -14,10 +14,11 @@ LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  (RX TX) AUX M0 M1
 // Define struct for sensor data
 struct sensordata_struct
 {
-	unsigned char pressure_sensor[59];        // 0 - 255
-	int temperature_sensor;               	  // -32,768 - 32,767
-	short unsigned int moisture_sensor;   	  // 0 - 65,535
-	short int heartbeat[59];                  // -32,768 - 32,767
+    unsigned char pressure_sensor[59];        // 0 - 255
+    int temperature_sensor;                   // -32,768 - 32,767
+    unsigned char moisture_sensor;   	  // 0 - 65,535
+    short int heartbeat[59];				  // -32,768 - 32,767
+	char heartbeat_bpm;
 };
 
 // Define struct for message
@@ -121,7 +122,7 @@ void setup()
 void loop()
 {
 	if (message_recieved)
-	// If a message is recieved and verified, print all heartbeat values.
+	// If a message is recieved, verified and not yet processed, print all heartbeat values.
 	{
 		for (char i = 0; i < 59; i++) 
 		{

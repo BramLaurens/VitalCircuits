@@ -19,17 +19,17 @@ Slider pressure_slider;
 Button create_screenshot;
 Button home_screen;
 Button ecg_screen;
+Button respiration_screen;
 
 // Initialize fonts
 PFont value_font;
-PFont ecg_font;
 PFont unit_font;
 PFont label_font;
 PFont title_font;
 
 // Initialize font sizes
 int value_font_size = 110;
-int ecg_font_size = 110;
+int important_value_font_size = 110;
 int unit_font_size = 110;
 int label_font_size = 110;
 int title_font_size = 110;
@@ -45,7 +45,7 @@ void setup()
 
   // println(PFont.list()); // Prints all fonts.
 
-  String serial = Serial.list()[0];  // Change if needed
+  String serial = Serial.list()[2];  // Change if needed
   port = new Serial(this, serial, 115200);
   heartbeat_values = new int[graph_max_length];  // Initialize array for heartbeat sensor values
   pressure_values = new int[graph_max_length];  // Initialize array for pressure sensor values
@@ -56,7 +56,6 @@ void setup()
 
   // Fonts
   value_font = createFont("Arial", value_font_size, true);
-  ecg_font = createFont("Arial",ecg_font_size, true);
   unit_font = createFont("Arial", unit_font_size, true);
   label_font = createFont("Arial", label_font_size, true);
   title_font = createFont("Arial Bold", title_font_size, true);
@@ -66,7 +65,7 @@ void setup()
   ecg_slider = p5.addSlider("ecg_slider")
                   .setPosition(width * 0.02, height * 0.34)
                   .setSize(int(width * 0.25), int(height * 0.03))
-                  .setNumberOfTickMarks(10)
+                  .setNumberOfTickMarks(20)
                   .snapToTickMarks(true)
                   .setRange(0, 0.15)
                   .setLabel("ECG Scale")
@@ -74,12 +73,12 @@ void setup()
                   
                   
   // pressure_slider
-  pressure_slider = p5.addSlider("pessure_slider")
+  pressure_slider = p5.addSlider("pressure_slider")
                       .setPosition(width * 0.02, (height * 0.3 + height * 0.03) + height * 0.36)
                       .setSize(int(width * 0.25), int(height * 0.03))
-                      .setNumberOfTickMarks(10)
+                      .setNumberOfTickMarks(20)
                       .snapToTickMarks(true)
-                      .setRange(0, 0.15)
+                      .setRange(0, 0.35)
                       .setLabel("Pressure Scale")
                       .setFont(label_font);
 
@@ -101,19 +100,30 @@ void setup()
   
   // ecg_screen
   ecg_screen = p5.addButton("ecg_screen")
-                  .setPosition(width * 0.85, height * 0.42)
+                  .setPosition(width * 0.85, height * 0.94)
                   .setSize(int(width * 0.05), int(height * 0.06))
                   .setLabel("ECG")
                   .setFont(label_font);
 
+  respiration_screen = p5.addButton("respiration_screen")
+                  .setPosition(width * 0.9, height * 0.94)
+                  .setSize(int(width * 0.1), int(height * 0.06))
+                  .setLabel("Respiration")
+                  .setFont(label_font);
 }
 
 
 void draw() 
 {
+  // Update values
+  String bpm_value = "62";
+  String respiration_rate_value = "25";
+  String temperature_value = "36.5";
+  String moisture_value = "14";
+
   // Update font size
   value_font_size = int(width * 0.07);
-  ecg_font_size = int(width * 0.1);
+  important_value_font_size = int(width * 0.1);
   unit_font_size = int(width * 0.02);
   title_font_size = int(width * 0.01);
 
@@ -137,10 +147,15 @@ void draw()
   ecg_screen.setPosition(width * 0.85, height * 0.94)
             .setSize(int(width * 0.05), int(height * 0.06));
 
+  respiration_screen.setPosition(width * 0.9, height * 0.94)
+                    .setSize(int(width * 0.1), int(height * 0.06));
+
 
   if (current_screen == 0) 
   {
     noFill();
+
+    // Show / hide control P5 elements
     ecg_slider.show();
     pressure_slider.show();
     create_screenshot.show();
@@ -177,9 +192,8 @@ void draw()
 
     // BPM value 
     textFont(value_font);
-    textSize(ecg_font_size);
-    String bpm = "62";
-    text(bpm, width * 0.78, height * 0.25);
+    textSize(important_value_font_size);
+    text(bpm_value, width * 0.78, height * 0.25);
 
     // BPM unit
     textFont(unit_font);
@@ -193,8 +207,7 @@ void draw()
     // Pressure value
     textFont(value_font);
     textSize(value_font_size);
-    String respiration_rate = "25";
-    text(respiration_rate, width * 0.78, height * 0.6);
+    text(respiration_rate_value, width * 0.78, height * 0.6);
 
     // Pressure unit
     textFont(unit_font);
@@ -215,8 +228,7 @@ void draw()
     textFont(value_font);
     textSize(value_font_size);
     
-    String temperature = "36.5";
-    text(temperature, width * 0.02, height * 0.92);
+    text(temperature_value, width * 0.02, height * 0.92);
 
     // Temperature unit
     textFont(unit_font);
@@ -235,8 +247,7 @@ void draw()
     // Moisture value
     textFont(value_font);
     textSize(value_font_size);
-    String moisture = "14";
-    text(moisture, width * 0.4, height * 0.92);
+    text(moisture_value, width * 0.4, height * 0.92);
 
     // Moisture unit
     textFont(unit_font);
@@ -245,6 +256,7 @@ void draw()
 
 
     // Draw ECG graph
+    noFill();
     beginShape();
     stroke(255, 0, 0); // Red
     for (int i = 0; i < heartbeat_values.length; i++) 
@@ -273,7 +285,7 @@ void draw()
 
 
     // Draw Pressure graph
-    
+    noFill();
     beginShape();
     stroke(153, 255, 255); // Light Blue
     for (int i = 0; i < pressure_values.length; i++) 
@@ -286,15 +298,24 @@ void draw()
                     );
 
       float y = map(pressure_values[i],
-                    0, 
                     4096, 
-                    (height * 0.03) + height * -pressure_scale, 
-                    (height * 0.27) + height * pressure_scale
+                    0, 
+                    (height * 0.38) - height * pressure_scale, 
+                    (height * 0.68)
                     );
 
+     y = min(height * 0.68, y);
+     y = max(height * 0.38, y);
+    vertex(x, y);
 
-    
-      vertex(x, y);
+    /*
+    rect( width * 0.02, 
+          (height * 0.3 + height * 0.03) + height * 0.05, 
+          width * 0.75, 
+          height * 0.3
+          );
+    */
+
     }
     endShape();
 
@@ -303,23 +324,23 @@ void draw()
   else if (current_screen == 1)
   {
     noFill();
-    // Hide unused control P5 elements.
+    // Show / hide control P5 elements
     pressure_slider.hide();
+    ecg_slider.show();
 
     ecg_slider.setPosition(width * 0.02, height * 0.92)
               .setSize(int(width * 0.25), int(height * 0.03));
 
 
     // Text
-    
     // --- BPM --- \\
     fill(255, 0, 0); // Red
 
     // BPM value 
     textFont(value_font);
-    textSize(ecg_font_size);
-    String bpm = "62";
-    text(bpm, width * 0.81, height * 0.25);
+    textSize(important_value_font_size);
+   
+    text(bpm_value, width * 0.81, height * 0.25);
 
     // BPM unit
     textFont(unit_font);
@@ -328,8 +349,7 @@ void draw()
     noFill();
 
 
-
-    // Draw graph outlines
+    // Draw graph outline
     stroke(255, 0, 0); // Red
     rect( width * 0.02, 
           height * 0.03, 
@@ -338,6 +358,7 @@ void draw()
           );  
 
      // Draw ECG graph
+    noFill();
     beginShape();
     stroke(255, 0, 0); // Red
     for (int i = 0; i < heartbeat_values.length; i++) 
@@ -369,6 +390,70 @@ void draw()
   
   } 
 
+  else if (current_screen == 2)
+  {
+    noFill();
+    // Show / hide control P5 elements   
+    ecg_slider.hide();
+    pressure_slider.show();
+
+    pressure_slider.setPosition(width * 0.02, height * 0.92)
+                   .setSize(int(width * 0.25), int(height * 0.03));
+
+
+    // Text
+    // --- BPM --- \\
+    fill(153, 255, 255); // Light Blue
+
+    // BPM value 
+    textFont(value_font);
+    textSize(important_value_font_size);
+    text(respiration_rate_value, width * 0.81, height * 0.25);
+
+    // BPM unit
+    textFont(unit_font);
+    textSize(unit_font_size);
+    text("Breaths p/m", width * 0.81, height * 0.3);
+    noFill();
+
+
+    // Draw graph outline
+    stroke(153, 255, 255); // Light Blue
+    rect( width * 0.02, 
+          height * 0.03, 
+          width * 0.78, 
+          height * 0.87
+          );  
+
+    // Draw respiration graph
+    noFill();
+    beginShape();
+    stroke(153, 255, 255); // Light Blue
+    for (int i = 0; i < pressure_values.length; i++) 
+    {
+      float x = map(i, 
+                    0, 
+                    pressure_values.length, 
+                    width * 0.03, 
+                    width * 0.02 + width * 0.74
+                    );
+
+      float y = map(pressure_values[i],  // ECG is upside down, flip it 180 degrees
+                    0, 
+                    4096, 
+                    (height * 0.03) + height * -pressure_scale, 
+                    (height * 0.27) + height * pressure_scale
+                    );
+
+
+      // Limit the y values to the graph area
+      y = min(height * 0.87 + height * 0.03, y);
+      y = max(height * 0.03, y);
+      vertex(x, y);
+
+
+    }
+  }
 }
 
 // Read Serial Data
@@ -445,6 +530,8 @@ public void create_screenshot()
   save(filename);
 }
 
+
+// Screens \\ 
 public void home_screen()
 {
   current_screen = 0;
@@ -453,6 +540,11 @@ public void home_screen()
 public void ecg_screen()
 {
   current_screen = 1;
+}
+
+public void respiration_screen()
+{
+  current_screen = 2;
 }
 
 public void settings() 

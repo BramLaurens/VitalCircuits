@@ -126,6 +126,7 @@ void loop()
 	{
 		for (char i = 0; i < 59; i++) 
 		{
+			Serial.print("h");
 			Serial.println(verifiedMessage.data.heartbeat[i]);
 			delayMicroseconds(2000);
 		}

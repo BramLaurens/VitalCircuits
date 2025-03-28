@@ -45,7 +45,7 @@ void setup()
 
   // println(PFont.list()); // Prints all fonts.
 
-  String serial = Serial.list()[2];  // Change if needed
+  String serial = Serial.list()[0];  // Change if needed
   port = new Serial(this, serial, 115200);
   heartbeat_values = new int[graph_max_length];  // Initialize array for heartbeat sensor values
   pressure_values = new int[graph_max_length];  // Initialize array for pressure sensor values
@@ -269,8 +269,8 @@ void draw()
                     );
 
       float y = map(heartbeat_values[i],  // ECG is upside down, flip it 180 degrees
-                    2800, 
-                    500, 
+                    40000, 
+                    6000, 
                     (height * 0.03) + height * -ECG_scale, 
                     (height * 0.27) + height * ECG_scale
                     );

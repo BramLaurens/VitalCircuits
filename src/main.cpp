@@ -18,7 +18,7 @@ struct sensordata_struct
     int temperature_sensor;                   // -32,768 - 32,767
     unsigned char moisture_sensor;   	  // 0 - 65,535
     short int heartbeat[59];				  // -32,768 - 32,767
-	char heartbeat_bpm;
+	//char heartbeat_bpm;
 };
 
 // Define struct for message
@@ -182,6 +182,10 @@ void reciever_loop(void *pvParameters)
 			default:
 				break;
 			}
+		}
+		else 
+		{
+			delayMicroseconds(10);
 		}
 	}
 }

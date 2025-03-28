@@ -5,6 +5,8 @@
 #include "Arduino.h"
 #include "LoRa_E220.h"
 
+#define ECGR_ARRAY_SIZE 58
+
 TaskHandle_t data_reciever_task;
 
 // ---------- esp32 pins --------------
@@ -14,11 +16,11 @@ LoRa_E220 e220ttl(&Serial2, 15, 21, 19); //  (RX TX) AUX M0 M1
 // Define struct for sensor data
 struct sensordata_struct
 {
-    unsigned char pressure_sensor[59];        // 0 - 255
+    unsigned char pressure_sensor[ECGR_ARRAY_SIZE];        // 0 - 255
     int temperature_sensor;                   // -32,768 - 32,767
     unsigned char moisture_sensor;   	  // 0 - 65,535
-    short int heartbeat[59];				  // -32,768 - 32,767
-	//char heartbeat_bpm;
+    short int heartbeat[ECGR_ARRAY_SIZE];				  // -32,768 - 32,767
+	char heartbeat_bpm;
 };
 
 // Define struct for message
@@ -124,12 +126,22 @@ void loop()
 	if (message_recieved)
 	// If a message is recieved, verified and not yet processed, print all heartbeat values.
 	{
-		for (char i = 0; i < 59; i++) 
+		for (char i = 0; i < ECGR_ARRAY_SIZE; i++) 
 		{
 			Serial.print("h");
 			Serial.println(verifiedMessage.data.heartbeat[i]);
+			
+			Serial.print("p");
+			Serial.println(verifiedMessage.data.pressure_sensor[i]);
 			delayMicroseconds(2000);
 		}
+
+		Serial.print("t");
+		Serial.println(verifiedMessage.data.temperature_sensor);
+		Serial.print("b");
+		Serial.println(verifiedMessage.data.heartbeat_bpm, DEC);
+		Serial.print("m");
+		Serial.println(verifiedMessage.data.moisture_sensor, DEC);
 		message_recieved = false;
 	}
 }
@@ -345,7 +357,7 @@ int create_LRC(message_struct message)
 	calculatedLRC += count_bits(message.data.moisture_sensor);
 	calculatedLRC += count_bits(message.data.temperature_sensor);
 
-	for (char i = 0; i < 59; i++)
+	for (char i = 0; i < ECGR_ARRAY_SIZE; i++)
 	{
 		calculatedLRC += count_bits(message.data.pressure_sensor[i]);
 		calculatedLRC += count_bits(message.data.heartbeat[i]);

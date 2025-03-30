@@ -89,6 +89,7 @@ bool lastmessage_done = false;
 bool data_pulled = true; //Init with true so that first sample can be taken and newdata_avail becomes true
 bool newdata_available = false;
 
+// BPM RPM Counter variables
 unsigned long bpm_lastpeakTime = 0;
 float bpmBuffer[BPM_BUFFER_SIZE];
 int bpm_bufferindex = 0;
@@ -102,6 +103,9 @@ int rpm_bufferindex = 0;
 bool rpm_bufferfilled = false;
 float rpm_peakthreshold = 0;
 float rpm = 0;
+
+// Leaky Integrator Variables
+float LI_previous = 0.0; // Previous value of the leaky integrator
 
 // Protoypes
 void printParameters(struct Configuration configuration);
@@ -131,6 +135,7 @@ void updateRPMBuffer(float rpm);
 void RPM_counter();
 float getAverageRPM();
 
+float LI_filter(float rawValue);
 
 // Create a sensordata struct with testdata, this will later be filled with real sensor data
 sensordata_struct test_data;
@@ -348,7 +353,7 @@ void data_samplepack(){
 			getAverageBPM();
 
 			live_data.heartbeat[i] = map(analogRead(ECG_PIN), 0, 4095, 0, 32767);
-			live_data.pressure_sensor[i] = map(analogRead(PRESSURE_PIN), 0, 4095, 0, 255);
+			live_data.pressure_sensor[i] = map(LI_filter(analogRead(PRESSURE_PIN)), 0, 4095, 0, 255);
 
 			delay(datasample_interval);
 		}
@@ -861,4 +866,14 @@ float getAverageRPM() {
     else{
       return 0;
     }
+}
+
+float LI_filter(float rawValue) {
+	float alpha = 0.99; // Higher alpha = more extreme smoothing
+
+	// Apply the leaky integrator formula
+	float filtered_val = rawValue * (1-alpha) + LI_previous * alpha;
+	LI_previous = filtered_val; // Store the current value for the next iteration
+
+	return filtered_val;
 }

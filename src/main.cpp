@@ -12,7 +12,7 @@
 #define LoRa_E220_DEBUG
 #define FREQUENCY_868
 #define MESSAGE_TIMEOUT 1000
-#define ECGR_ARRAY_SIZE 58
+#define ECGR_ARRAY_SIZE 57
 
 #define ECG_PIN 34
 #define PRESSURE_PIN 35
@@ -49,6 +49,7 @@ struct sensordata_struct
     unsigned char moisture_sensor;   	  // 0 - 65,535
     short int heartbeat[ECGR_ARRAY_SIZE];				  // -32,768 - 32,767
 	char heartbeat_bpm;
+	char pressure_rpm;
 };
 
 // Define the struct for the output message
@@ -325,11 +326,11 @@ void lora_TXRX(void *pvParameters)
 void loop()
 {
 	// RPM_counter();
-	BPM_counter();
-	getAverageBPM();
+	// BPM_counter();
+	// getAverageBPM();
 
-	RPM_counter();
-	getAverageRPM();
+	// RPM_counter();
+	// getAverageRPM();
 
 	data_samplepack();
 }
@@ -367,6 +368,7 @@ void data_samplepack(){
 		live_data.moisture_sensor = moist_calc();
 		live_data.temperature_sensor = temp_calc();
 		live_data.heartbeat_bpm = getAverageBPM();
+		live_data.pressure_rpm = getAverageRPM();
 
 		#ifdef packed_data_debug
 			Serial.print(" Moist: ");

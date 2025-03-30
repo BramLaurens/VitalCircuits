@@ -325,13 +325,6 @@ void lora_TXRX(void *pvParameters)
 // Main Loop, this loop is used to collect sensor data and process it.
 void loop()
 {
-	// RPM_counter();
-	// BPM_counter();
-	// getAverageBPM();
-
-	// RPM_counter();
-	// getAverageRPM();
-
 	data_samplepack();
 }
 
@@ -353,8 +346,8 @@ void data_samplepack(){
 		// Collect sensor data when last message is sent and acknowledged
 		for(int i = 0; i < ECGR_ARRAY_SIZE; i++)
 		{
-			BPM_counter();
-			getAverageBPM();
+			// BPM_counter();
+			// getAverageBPM();
 
 			RPM_counter();
 			getAverageRPM();

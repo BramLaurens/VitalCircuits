@@ -28,8 +28,8 @@
 // RPM definitions
 #define RPM_BUFFER_SIZE 10  // Moving average buffer size
 #define RPM_PEAK_THRESHOLD_FACTOR 0.8  // Adaptive threshold factor
-#define RPM_MIN_RR_INTERVAL 300  // Minimum time between R-peaks (ms)
-#define RPM_NOISE_THRESHOLD 500  // Ignore peaks below this value
+#define RPM_MIN_RR_INTERVAL 500  // Minimum time between R-peaks (ms)
+#define RPM_NOISE_THRESHOLD 2000  // Ignore peaks below this value
 
 #include "Arduino.h"
 #include "LoRa_E220.h"
@@ -328,6 +328,9 @@ void loop()
 	BPM_counter();
 	getAverageBPM();
 
+	RPM_counter();
+	getAverageRPM();
+
 	data_samplepack();
 }
 
@@ -351,6 +354,9 @@ void data_samplepack(){
 		{
 			BPM_counter();
 			getAverageBPM();
+
+			RPM_counter();
+			getAverageRPM();
 
 			live_data.heartbeat[i] = map(analogRead(ECG_PIN), 0, 4095, 0, 32767);
 			live_data.pressure_sensor[i] = map(LI_filter(analogRead(PRESSURE_PIN)), 0, 4095, 0, 255);
@@ -796,33 +802,41 @@ float getAverageBPM() {
 void RPM_counter(){
     static float lastValue = 0;
     static float maxPressure = 0;
+	static float lastResettime = 0;
     unsigned long currentTime = millis();
     
     // Read ECG signal
-    float pressureValue = analogRead(PRESSURE_PIN);
+    float pressureValue = 4096 - LI_filter(analogRead(PRESSURE_PIN)); // Filter and invert the value to get pressure
     
+	// Reset maxECG every 5 seconds
+    if (currentTime - rpm_lastpeakTime > 5000 && maxPressure > 0 && currentTime - lastResettime > 5000) {  
+        maxPressure = 0;
+		lastResettime = currentTime;
+    }
+	
+
     // Update peak threshold dynamically
     if (pressureValue > maxPressure) {
         maxPressure = pressureValue;
         rpm_peakthreshold = maxPressure * RPM_PEAK_THRESHOLD_FACTOR;
     }
 
-    // Reset maxECG every 2 seconds
-    if (currentTime - rpm_lastpeakTime > 2000) {  
-        maxPressure = 0;
-    }
-    
-    // Reset BPM after 5 seconds of inactivity
-    if (currentTime - rpm_lastpeakTime > 4000) {  
+    // Reset BPM after 10 seconds of inactivity
+    if (currentTime - rpm_lastpeakTime > 10000) {  
         rpm = 0;
-        updateBPMBuffer(rpm);
+        updateRPMBuffer(rpm);
     }
+	
 
     // Detect peaks
     if (pressureValue > rpm_peakthreshold && pressureValue > RPM_NOISE_THRESHOLD && lastValue <= rpm_peakthreshold) {
+		#ifdef rpm_debug
+			Serial.print(" Peak detected: ");
+		#endif
+
         unsigned long rrInterval = currentTime - rpm_lastpeakTime;
         if (rrInterval > RPM_MIN_RR_INTERVAL) {  // Ignore noise and too-fast beats
-            bpm = 60000.0 / rrInterval;
+            rpm = 60000.0 / rrInterval;
             updateRPMBuffer(rpm);
             rpm_lastpeakTime = currentTime;
         }
@@ -831,7 +845,11 @@ void RPM_counter(){
     lastValue = pressureValue;
 
 	#ifdef rpm_debug
-		Serial.print("Pressure: ");
+		Serial.print("Max pressure: ");
+		Serial.print(maxPressure);
+		Serial.print("	Peak treshold: ");
+		Serial.print(rpm_peakthreshold);
+		Serial.print("	Pressure: ");
 		Serial.print(pressureValue);
 		Serial.print("	Instant RPM: ");
 		Serial.print(rpm);

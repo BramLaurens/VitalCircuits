@@ -5,7 +5,7 @@
 #include "Arduino.h"
 #include "LoRa_E220.h"
 
-#define ECGR_ARRAY_SIZE 58
+#define ECGR_ARRAY_SIZE 57
 
 TaskHandle_t data_reciever_task;
 
@@ -21,6 +21,7 @@ struct sensordata_struct
     unsigned char moisture_sensor;   	  // 0 - 65,535
     short int heartbeat[ECGR_ARRAY_SIZE];				  // -32,768 - 32,767
 	char heartbeat_bpm;
+	char pressure_rpm;
 };
 
 // Define struct for message
@@ -107,7 +108,7 @@ void setup()
 	xTaskCreatePinnedToCore(
 		reciever_loop, 
 		"data_reciever_task",
-		10000,
+		8000,
 		NULL,
 		1,
 		&data_reciever_task,
@@ -142,6 +143,8 @@ void loop()
 		Serial.println(verifiedMessage.data.heartbeat_bpm, DEC);
 		Serial.print("m");
 		Serial.println(verifiedMessage.data.moisture_sensor, DEC);
+		Serial.print("r");
+		Serial.println(verifiedMessage.data.pressure_rpm, DEC);
 		message_recieved = false;
 	}
 }

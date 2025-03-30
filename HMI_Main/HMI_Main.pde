@@ -523,6 +523,11 @@ void serialEvent(Serial port)
           line = line.substring(1); // Remove the first character from the string
           bpm_value = line;
           break;
+        
+        case 'r': // Respiration rate
+          line = line.substring(1); // Remove the first character from the string
+          respiration_rate_value = line;
+          break;
 
         default:  // unknown / Garbage
           println("UNKNOWN VALUE");

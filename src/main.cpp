@@ -24,7 +24,7 @@ struct sensordata_struct
 	char pressure_rpm;
 };
 
-// Define struct for message
+// Define struct for messages
 struct message_struct
 {
 	char soc;

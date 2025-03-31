@@ -129,11 +129,11 @@ int count_bits(int num);
 int rolling_averagetime();
 
 void updateBPMBuffer(float bpm);
-void BPM_counter();
+void BPM_counter(float rawVal);
 float getAverageBPM();
 
 void updateRPMBuffer(float rpm);
-void RPM_counter();
+void RPM_counter(float rawVal);
 float getAverageRPM();
 
 float LI_filter(float rawValue);
@@ -346,14 +346,16 @@ void data_samplepack(){
 		// Collect sensor data when last message is sent and acknowledged
 		for(int i = 0; i < ECGR_ARRAY_SIZE; i++)
 		{
-			BPM_counter();
+			float ecgRaw = analogRead(ECG_PIN);
+			float pressureRaw = analogRead(PRESSURE_PIN);
+			BPM_counter(ecgRaw);
 			getAverageBPM();
 
-			RPM_counter();
+			RPM_counter(pressureRaw);
 			getAverageRPM();
 
-			live_data.heartbeat[i] = map(analogRead(ECG_PIN), 0, 4095, 0, 32767);
-			live_data.pressure_sensor[i] = map(LI_filter(analogRead(PRESSURE_PIN)), 0, 4095, 0, 255);
+			live_data.heartbeat[i] = map(ecgRaw, 0, 4095, 0, 32767);
+			live_data.pressure_sensor[i] = map(LI_filter(pressureRaw), 0, 4095, 0, 255);
 
 			delay(datasample_interval);
 		}
@@ -719,23 +721,23 @@ int rolling_averagetime()
 	return sum/10;
 }
 
-void BPM_counter(){
+void BPM_counter(float rawVal){
     static float lastValue = 0;
     static float maxECG = 0;
     unsigned long currentTime = millis();
+	static float lastResettime = 0;
     
     // Read ECG signal
-    float ecgValue = analogRead(ECG_PIN);
     
-    // Update peak threshold dynamically
-    if (ecgValue > maxECG) {
-        maxECG = ecgValue;
-        bpm_peakthreshold = maxECG * BPM_PEAK_THRESHOLD_FACTOR;
-    }
+	// Reset maxECG every 2 seconds
+	if (currentTime - bpm_lastpeakTime > 2000 && maxECG > 0 && currentTime - lastResettime > 2000) {  
+		maxECG = 0;
+	}
 
-    // Reset maxECG every 2 seconds
-    if (currentTime - bpm_lastpeakTime > 2000) {  
-        maxECG = 0;
+    // Update peak threshold dynamically
+    if (rawVal > maxECG) {
+        maxECG = rawVal;
+        bpm_peakthreshold = maxECG * BPM_PEAK_THRESHOLD_FACTOR;
     }
     
     // Reset BPM after 5 seconds of inactivity
@@ -745,7 +747,7 @@ void BPM_counter(){
     }
 
     // Detect peaks
-    if (ecgValue > bpm_peakthreshold && ecgValue > BPM_NOISE_THRESHOLD && lastValue <= bpm_peakthreshold) {
+    if (rawVal > bpm_peakthreshold && rawVal > BPM_NOISE_THRESHOLD && lastValue <= bpm_peakthreshold) {
         unsigned long rrInterval = currentTime - bpm_lastpeakTime;
         if (rrInterval > BPM_MIN_RR_INTERVAL) {  // Ignore noise and too-fast beats
             bpm = 60000.0 / rrInterval;
@@ -754,7 +756,7 @@ void BPM_counter(){
         }
     }
     
-    lastValue = ecgValue;
+    lastValue = rawVal;
 
 	#ifdef bpm_debug
 		Serial.print("Max ECG: ");
@@ -794,14 +796,14 @@ float getAverageBPM() {
     }
 }
 
-void RPM_counter(){
+void RPM_counter(float rawVal){
     static float lastValue = 0;
     static float maxPressure = 0;
 	static float lastResettime = 0;
     unsigned long currentTime = millis();
     
     // Read ECG signal
-    float pressureValue = 4096 - LI_filter(analogRead(PRESSURE_PIN)); // Filter and invert the value to get pressure
+    float pressureValue = 4096 - LI_filter(rawVal); // Filter and invert the value to get pressure
     
 	// Reset maxECG every 5 seconds
     if (currentTime - rpm_lastpeakTime > 5000 && maxPressure > 0 && currentTime - lastResettime > 5000) {  

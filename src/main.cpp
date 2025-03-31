@@ -108,7 +108,7 @@ void setup()
 	xTaskCreatePinnedToCore(
 		reciever_loop, 
 		"data_reciever_task",
-		8000,
+		12000,
 		NULL,
 		1,
 		&data_reciever_task,

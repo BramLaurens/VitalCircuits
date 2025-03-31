@@ -248,7 +248,7 @@ void draw()
     // Temperature unit
     textFont(unit_font);
     textSize(unit_font_size);
-    text("°C", width * 0.02 + width * 0.14, height * 0.92);
+    text("°C", width * 0.1 + width * 0.10, height * 0.92);
 
 
     // --- Moisture --- \\
